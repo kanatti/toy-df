@@ -19,7 +19,7 @@ impl LogicalPlan {
             match plan {
                 LogicalPlan::Projection(projection) => {
                     pp(format!("Projection {:?}", projection.exprs), level);
-                    describe_at(&projection.input, level);
+                    describe_at(&projection.input, level + 1);
                 }
                 LogicalPlan::Filter(filter) => {
                     pp(format!("Filter {:?}", filter.expr), level);
@@ -62,7 +62,6 @@ pub struct Scan {
 pub struct Limit {}
 
 fn pp(message: String, level: usize) {
-    // pad by level and print
-    let padding = " ".repeat(level);
+    let padding = "  ".repeat(level);
     println!("{}{}", padding, message);
 }

@@ -1,6 +1,6 @@
-# Query Engine
+# Toy DF
 
-Hacking on query-engine in rust from scratch. Totally based on DataFusion, infact purpose is to understand datafusion internals better.
+A toy version of Apache DataFusion, written from scratch. Purpose is to understand the internals of DataFusion better.
 
 ## Architecture
 
@@ -47,8 +47,12 @@ Hacking on query-engine in rust from scratch. Totally based on DataFusion, infac
 
 ## Plan
 
-1. Start with DataFrame based API only for frontend.
-    1. Read csv, parquet.
-2. Model PlanNodes, Expressions and Tree Traversal for Logical Plan.
-3. Analyzer and Optimizer Rules that can tranverse and rewrite the tree.
-4. TBD
+As a first milestone, we will try to get basic select + filter work end to end.
+- [x] Expressions
+- [x] DataFrame API
+- [x] LogicalPlan
+- [ ] Execution Plan scaffolding
+- [ ] Parquet and arrow integration
+- [ ] Scan execution
+- [ ] Projection execution
+- [ ] Filter execution
