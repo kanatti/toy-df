@@ -1,5 +1,6 @@
 /// A typed single value.
 /// Larger variants are boxed to keep enum size smaller.
+#[derive(Debug)]
 pub enum ScalarValue {
     Boolean(Option<bool>),
     Int8(Option<i8>),

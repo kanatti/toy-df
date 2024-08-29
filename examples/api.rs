@@ -1,5 +1,5 @@
-use toy_df::SessionContext;
 use toy_df::prelude::*;
+use toy_df::SessionContext;
 
 fn main() {
     let ctx = SessionContext::new();
@@ -9,6 +9,7 @@ fn main() {
     df = df
         .select(vec![col("a"), col("b")])
         .filter(col("a").gt(lit(10)));
+    df.logical_plan().describe();
     // Collect
     df.show();
 }

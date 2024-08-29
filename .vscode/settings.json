@@ -1,0 +1,7 @@
+{
+    "workbench.colorTheme": "Gruvbox Material Dark",
+    "gruvboxMaterial.darkContrast": "hard",
+    "gruvboxMaterial.darkWorkbench": "flat",
+    "gruvboxMaterial.highContrast": true,
+    "gruvboxMaterial.darkPalette": "mix"
+}

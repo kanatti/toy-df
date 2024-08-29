@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use expr::Expression;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 
@@ -44,24 +46,30 @@ pub struct DataFrame {
 }
 
 impl DataFrame {
-    pub fn select(&self, exprs: Vec<Expression>) -> DataFrame {
+    pub fn select(self, exprs: Vec<Expression>) -> DataFrame {
         DataFrame {
             plan: LogicalPlan::Projection(Projection {
-
+                input: Arc::new(self.plan),
+                exprs
             })
         }
     }
 
-    pub fn filter(&self, expr: Expression) -> DataFrame {
+    pub fn filter(self, expr: Expression) -> DataFrame {
         DataFrame {
             plan: LogicalPlan::Filter(Filter {
-
+                input: Arc::new(self.plan),
+                expr
             })
         }
     }
 
     pub fn show(&self) {
         println!("DataFrame");
+    }
+
+    pub fn logical_plan(&self) -> &LogicalPlan {
+        &self.plan
     }
 }
 

@@ -6,6 +6,7 @@ pub mod expr_fn;
 
 /// Expression Tree.
 /// Used in SELECT clauses, WHERE predicates etc.
+#[derive(Debug)]
 pub enum Expression {
     Literal(ScalarValue),
     Column(Column),
@@ -24,6 +25,7 @@ impl Expression {
     }
 }
 
+#[derive(Debug)]
 pub struct Column {
     pub name: String,
 }
@@ -34,12 +36,14 @@ impl Column {
     }
 }
 
+#[derive(Debug)]
 pub struct BinaryExpression {
     pub left: Expression,
     pub right: Expression,
     pub op: BinaryOperator,
 }
 
+#[derive(Debug)]
 pub enum BinaryOperator {
     Equals,
     NotEquals,
@@ -51,11 +55,13 @@ pub enum BinaryOperator {
     Or,
 }
 
+#[derive(Debug)]
 pub struct ScalarFunction {
     pub name: String,
     pub args: Vec<Expression>,
 }
 
+#[derive(Debug)]
 pub struct AggregateFunction {
     pub name: String,
     pub args: Vec<Expression>,
