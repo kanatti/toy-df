@@ -1,9 +1,10 @@
 use expr::Expression;
+use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 
+pub mod common;
 pub mod expr;
 pub mod logical_plan;
 pub mod prelude;
-pub mod common;
 
 /// SessionContext is the entry point toy-df.
 pub struct SessionContext {}
@@ -13,8 +14,12 @@ impl SessionContext {
         Self {}
     }
 
-    pub fn read_csv<P: FilePaths>(&self , paths: P) -> Result<DataFrame> {
-        Ok(DataFrame {})
+    pub fn read_csv<P: FilePaths>(&self, paths: P) -> Result<DataFrame> {
+        Ok(DataFrame {
+            plan: LogicalPlan::Scan(Scan {
+                source_paths: paths.file_paths().into_iter().collect(),
+            }),
+        })
     }
 }
 
@@ -34,15 +39,25 @@ impl FilePaths for &str {
     }
 }
 
-pub struct DataFrame {}
+pub struct DataFrame {
+    plan: LogicalPlan,
+}
 
 impl DataFrame {
     pub fn select(&self, exprs: Vec<Expression>) -> DataFrame {
-        DataFrame {}
+        DataFrame {
+            plan: LogicalPlan::Projection(Projection {
+
+            })
+        }
     }
 
     pub fn filter(&self, expr: Expression) -> DataFrame {
-        DataFrame {}
+        DataFrame {
+            plan: LogicalPlan::Filter(Filter {
+
+            })
+        }
     }
 
     pub fn show(&self) {
