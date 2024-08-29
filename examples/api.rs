@@ -1,5 +1,5 @@
-use query_engine::SessionContext;
-use query_engine::prelude::*;
+use toy_df::SessionContext;
+use toy_df::prelude::*;
 
 fn main() {
     let ctx = SessionContext::new();

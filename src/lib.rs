@@ -5,7 +5,7 @@ pub mod logical_plan;
 pub mod prelude;
 pub mod common;
 
-/// SessionContext is the entry point to query-engine.
+/// SessionContext is the entry point toy-df.
 pub struct SessionContext {}
 
 impl SessionContext {
