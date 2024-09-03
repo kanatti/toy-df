@@ -37,6 +37,18 @@ impl LogicalPlan {
 
         describe_at(self, 0);
     }
+
+    pub fn inputs(&self) -> Vec<Arc<LogicalPlan>> {
+        match self {
+            LogicalPlan::Projection(projection) => vec![projection.input.clone()],
+            LogicalPlan::Filter(filter) => vec![filter.input.clone()],
+            LogicalPlan::Aggregate(_) => todo!(),
+            LogicalPlan::Sort(_) => todo!(),
+            LogicalPlan::Join(_) => todo!(),
+            LogicalPlan::Scan(_) => vec![],
+            LogicalPlan::Limit(_) => todo!(),
+        }
+    }
 }
 
 pub struct Projection {
@@ -64,4 +76,22 @@ pub struct Limit {}
 fn pp(message: String, level: usize) {
     let padding = "  ".repeat(level);
     println!("{}{}", padding, message);
+}
+
+// Helpers for creating logical plan nodes
+
+pub mod helpers {
+    use super::*;
+
+    pub fn projection(exprs: Vec<Expression>, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+        Arc::new(LogicalPlan::Projection(Projection { exprs, input }))
+    }
+
+    pub fn filter(expr: Expression, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+        Arc::new(LogicalPlan::Filter(Filter { expr, input }))
+    }
+
+    pub fn scan(source_paths: Vec<String>) -> Arc<LogicalPlan> {
+        Arc::new(LogicalPlan::Scan(Scan { source_paths }))
+    }
 }

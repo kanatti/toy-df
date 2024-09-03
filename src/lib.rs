@@ -6,6 +6,7 @@ use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 pub mod common;
 pub mod expr;
 pub mod logical_plan;
+pub mod physical_plan;
 pub mod prelude;
 
 /// SessionContext is the entry point toy-df.
