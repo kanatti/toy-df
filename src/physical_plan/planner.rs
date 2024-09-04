@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use crate::logical_plan::LogicalPlan;
+use crate::logical_plan::{self, LogicalPlan};
 
-use super::plan::{DummyExec, ExecutionPlan};
+use super::plan::{ExecutionPlan, FilterExec, ProjectionExec, ScanExec};
 
 pub type Result<T> = std::result::Result<T, PlannerError>;
 
@@ -26,9 +26,9 @@ impl PhysicalPlanner {
         let mut stack = vec![root];
         let mut peek = 0;
         while peek < stack.len() {
-            let node = stack[peek].clone();
+            let node = Rc::clone(&stack[peek]);
             for child in node.borrow().logical_plan.inputs() {
-                let node = physical_node_ref(child, Some(node.clone()));
+                let node = physical_node_ref(child, Some(Rc::clone(&node)));
                 stack.push(node);
             }
             peek += 1;
@@ -46,7 +46,7 @@ impl PhysicalPlanner {
             );
 
             // convert the plan.
-            let physical_plan = convert_to_plan(node.clone());
+            let physical_plan = convert_to_plan(Rc::clone(&node));
 
             // update parent.
             if let Some(ref parent) = node.borrow().parent {
@@ -61,6 +61,7 @@ impl PhysicalPlanner {
 }
 
 /// An intermediate holder for generating execution plan.
+#[derive(Debug)]
 struct PhysicalNode {
     pub children_expected: usize,
     pub children_converted: Vec<Arc<dyn ExecutionPlan>>,
@@ -86,9 +87,44 @@ fn physical_node_ref(
 
 // TODO: Actual conversion logic.
 fn convert_to_plan(node: PhysicalNodeRef) -> Arc<dyn ExecutionPlan> {
-    Arc::new(DummyExec::new(node.borrow().logical_plan.clone()))
+    let node = node.borrow();
+    match node.logical_plan.as_ref() {
+        LogicalPlan::Scan(scan) => convert_scan(scan),
+        LogicalPlan::Filter(filter) => {
+            let input = node.children_converted.get(0).unwrap();
+            convert_filter(filter, Arc::clone(input))
+        }
+        LogicalPlan::Projection(projection) => {
+            let input = node.children_converted.get(0).unwrap();
+            convert_projection(projection, Arc::clone(input))
+        }
+        LogicalPlan::Aggregate(_) => todo!(),
+        LogicalPlan::Sort(_) => todo!(),
+        LogicalPlan::Join(_) => todo!(),
+        LogicalPlan::Limit(_) => todo!(),
+    }
 }
 
+pub fn convert_scan(scan: &logical_plan::Scan) -> Arc<dyn ExecutionPlan> {
+    return Arc::new(ScanExec::new(scan.source_paths.clone()));
+}
+
+pub fn convert_filter(
+    filter: &logical_plan::Filter,
+    input: Arc<dyn ExecutionPlan>,
+) -> Arc<dyn ExecutionPlan> {
+    // TODO: Fix clone, move to PhysicalExpr
+    return Arc::new(FilterExec::new(filter.expr.clone(), input));
+}
+
+pub fn convert_projection(
+    projection: &logical_plan::Projection,
+    input: Arc<dyn ExecutionPlan>,
+) -> Arc<dyn ExecutionPlan> {
+    return Arc::new(ProjectionExec::new(projection.exprs.clone(), input));
+}
+
+#[derive(Debug)]
 pub struct PlannerError {}
 
 #[cfg(test)]

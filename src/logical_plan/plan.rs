@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::expr::Expression;
 
+#[derive(Debug)]
 pub enum LogicalPlan {
     Projection(Projection),
     Filter(Filter),
@@ -40,8 +41,8 @@ impl LogicalPlan {
 
     pub fn inputs(&self) -> Vec<Arc<LogicalPlan>> {
         match self {
-            LogicalPlan::Projection(projection) => vec![projection.input.clone()],
-            LogicalPlan::Filter(filter) => vec![filter.input.clone()],
+            LogicalPlan::Projection(projection) => vec![Arc::clone(&projection.input)],
+            LogicalPlan::Filter(filter) => vec![Arc::clone(&filter.input)],
             LogicalPlan::Aggregate(_) => todo!(),
             LogicalPlan::Sort(_) => todo!(),
             LogicalPlan::Join(_) => todo!(),
@@ -51,26 +52,33 @@ impl LogicalPlan {
     }
 }
 
+#[derive(Debug)]
 pub struct Projection {
     pub exprs: Vec<Expression>,
     pub input: Arc<LogicalPlan>,
 }
 
+#[derive(Debug)]
 pub struct Filter {
     pub expr: Expression,
     pub input: Arc<LogicalPlan>,
 }
 
+#[derive(Debug)]
 pub struct Aggregate {}
 
+#[derive(Debug)]
 pub struct Sort {}
 
+#[derive(Debug)]
 pub struct Join {}
 
+#[derive(Debug)]
 pub struct Scan {
     pub source_paths: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct Limit {}
 
 fn pp(message: String, level: usize) {

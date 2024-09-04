@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use expr::Expression;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
+use physical_plan::planner::PhysicalPlanner;
 
 pub mod common;
 pub mod expr;
@@ -19,9 +20,9 @@ impl SessionContext {
 
     pub fn read_csv<P: FilePaths>(&self, paths: P) -> Result<DataFrame> {
         Ok(DataFrame {
-            plan: LogicalPlan::Scan(Scan {
+            plan: Arc::new(LogicalPlan::Scan(Scan {
                 source_paths: paths.file_paths().into_iter().collect(),
-            }),
+            })),
         })
     }
 }
@@ -43,34 +44,36 @@ impl FilePaths for &str {
 }
 
 pub struct DataFrame {
-    plan: LogicalPlan,
+    pub plan: Arc<LogicalPlan>,
 }
 
 impl DataFrame {
     pub fn select(self, exprs: Vec<Expression>) -> DataFrame {
         DataFrame {
-            plan: LogicalPlan::Projection(Projection {
-                input: Arc::new(self.plan),
-                exprs
-            })
+            plan: Arc::new(LogicalPlan::Projection(Projection {
+                input: self.plan,
+                exprs,
+            })),
         }
     }
 
     pub fn filter(self, expr: Expression) -> DataFrame {
         DataFrame {
-            plan: LogicalPlan::Filter(Filter {
-                input: Arc::new(self.plan),
-                expr
-            })
+            plan: Arc::new(LogicalPlan::Filter(Filter {
+                input: self.plan,
+                expr,
+            })),
         }
     }
 
     pub fn show(&self) {
-        println!("DataFrame");
+        let planner = PhysicalPlanner::new();
+        let physical_plan = planner.create_physical_plan(Arc::clone(&self.plan));
+        println!("{:#?}", physical_plan);
     }
 
-    pub fn logical_plan(&self) -> &LogicalPlan {
-        &self.plan
+    pub fn logical_plan(&self) -> Arc<LogicalPlan> {
+        Arc::clone(&self.plan)
     }
 }
 
