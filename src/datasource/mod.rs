@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use arrow_schema::SchemaRef;
+
 use crate::{error::Result, physical_plan::plan::ExecutionPlan};
 
 pub trait TableProvider {
@@ -7,4 +9,4 @@ pub trait TableProvider {
     fn scan(&self) -> Result<Arc<dyn ExecutionPlan>>;
 }
 
-pub struct SchemaRef {}
+pub mod csv;

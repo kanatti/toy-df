@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use datasource::csv::CsvReadOptions;
 use error::Result;
 use expr::Expression;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
@@ -21,7 +22,7 @@ impl SessionContext {
         Self {}
     }
 
-    pub fn read_csv<P: FilePaths>(&self, paths: P) -> Result<DataFrame> {
+    pub fn read_csv<P: FilePaths>(&self, paths: P, options: CsvReadOptions) -> Result<DataFrame> {
         Ok(DataFrame {
             plan: Arc::new(LogicalPlan::Scan(Scan {
                 source_paths: paths.file_paths().into_iter().collect(),
