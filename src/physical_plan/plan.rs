@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
+use arrow::array::RecordBatch;
+use arrow_schema::Schema;
+
 use crate::{error::Result, expr::Expression};
 
 pub trait ExecutionPlan: std::fmt::Debug {
     fn execute(&self) -> Result<RecordBatch>;
 }
-
-pub struct RecordBatch {}
 
 pub enum ExecutionError {}
 
@@ -23,7 +24,7 @@ impl ScanExec {
 
 impl ExecutionPlan for ScanExec {
     fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch {})
+        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
     }
 }
 
@@ -41,7 +42,7 @@ impl FilterExec {
 
 impl ExecutionPlan for FilterExec {
     fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch {})
+        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
     }
 }
 
@@ -59,6 +60,6 @@ impl ProjectionExec {
 
 impl ExecutionPlan for ProjectionExec {
     fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch {})
+        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
     }
 }

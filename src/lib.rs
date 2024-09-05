@@ -10,7 +10,7 @@ pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod prelude;
-pub mod table;
+pub mod datasource;
 pub mod error;
 
 /// SessionContext is the entry point toy-df.
