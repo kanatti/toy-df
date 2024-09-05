@@ -28,11 +28,10 @@ fn main() {
 
     // Filter BinaryExpression(BinaryExpression { left: Column(Column { name: "age" }), right: Literal(Int32(Some(30))), op: GreaterThan })
     //   Projection [Column(Column { name: "name" }), Column(Column { name: "age" })]
-    //     Scan ["/Users/balu/Code/toy-df/examples/data.csv"]
+    //     Scan CsvTable { source_paths: ["/Users/kanatti/Code/toy-df/examples/data.csv"] }
 
     df.logical_plan().describe();
 
-    // Currently just shows physical plan.
     // Ok(
     //     FilterExec {
     //         expr: BinaryExpression(
@@ -66,9 +65,11 @@ fn main() {
     //                 ),
     //             ],
     //             input: ScanExec {
-    //                 source_paths: [
-    //                     "/Users/balu/Code/toy-df/examples/data.csv",
-    //                 ],
+    //                 table: CsvTable {
+    //                     source_paths: [
+    //                         "/Users/kanatti/Code/toy-df/examples/data.csv",
+    //                     ],
+    //                 },
     //             },
     //         },
     //     },

@@ -6,5 +6,6 @@ pub type Result<T> = result::Result<T, ToyDfError>;
 pub enum ToyDfError {
     ExecutionError,
     PlanError,
+    TableNotFound,
     // Add other error types as needed
 }

@@ -1,6 +1,9 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use crate::{error::{Result, ToyDfError}, logical_plan::{self, LogicalPlan}};
+use crate::{
+    error::{Result, ToyDfError},
+    logical_plan::{self, LogicalPlan},
+};
 
 use super::plan::{ExecutionPlan, FilterExec, ProjectionExec, ScanExec};
 
@@ -103,7 +106,7 @@ fn convert_to_plan(node: PhysicalNodeRef) -> Arc<dyn ExecutionPlan> {
 }
 
 pub fn convert_scan(scan: &logical_plan::Scan) -> Arc<dyn ExecutionPlan> {
-    return Arc::new(ScanExec::new(scan.source_paths.clone()));
+    return Arc::new(ScanExec::new(scan.table.clone()));
 }
 
 pub fn convert_filter(
@@ -127,12 +130,15 @@ pub struct PlannerError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::datasource::csv::CsvTable;
     use crate::logical_plan::helpers::*;
     use crate::prelude::*;
 
     #[test]
     fn test_create_physical_plan() {
-        let scan = scan(vec![]);
+        let scan = scan(Arc::new(CsvTable {
+            source_paths: vec![],
+        }));
         let filter = filter(col("a").gt(lit(1)), scan);
         let projection = projection(vec![col("a"), col("b")], filter);
 

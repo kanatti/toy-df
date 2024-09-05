@@ -1,33 +1,58 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use datasource::csv::CsvReadOptions;
-use error::Result;
+use datasource::{
+    csv::{CsvReadOptions, CsvTable},
+    TableProvider,
+};
+use error::{Result, ToyDfError};
 use expr::Expression;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 use physical_plan::planner::PhysicalPlanner;
 
 pub mod common;
+pub mod datasource;
+pub mod error;
 pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod prelude;
-pub mod datasource;
-pub mod error;
 
 /// SessionContext is the entry point toy-df.
-pub struct SessionContext {}
+pub struct SessionContext {
+    tables: HashMap<String, Arc<dyn TableProvider>>,
+}
 
 impl SessionContext {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            tables: HashMap::new(),
+        }
     }
 
     pub fn read_csv<P: FilePaths>(&self, paths: P, options: CsvReadOptions) -> Result<DataFrame> {
         Ok(DataFrame {
             plan: Arc::new(LogicalPlan::Scan(Scan {
-                source_paths: paths.file_paths().into_iter().collect(),
+                table: Arc::new(CsvTable {
+                    source_paths: paths.file_paths().into_iter().collect(),
+                }),
             })),
         })
+    }
+
+    pub fn register_table(&mut self, name: String, provider: Arc<dyn TableProvider>) -> Result<()> {
+        self.tables.insert(name, provider);
+        Ok(())
+    }
+
+    pub fn table(&self, name: String) -> Result<DataFrame> {
+        self.tables
+            .get(&name)
+            .map(|provider| DataFrame {
+                plan: Arc::new(LogicalPlan::Scan(Scan {
+                    table: provider.clone(),
+                })),
+            })
+            .ok_or_else(|| ToyDfError::TableNotFound)
     }
 }
 

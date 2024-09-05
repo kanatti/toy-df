@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use arrow_schema::Schema;
 
-use crate::{error::Result, expr::Expression};
+use crate::{datasource::TableProvider, error::Result, expr::Expression};
 
 pub trait ExecutionPlan: std::fmt::Debug {
     fn execute(&self) -> Result<RecordBatch>;
@@ -13,12 +13,12 @@ pub enum ExecutionError {}
 
 #[derive(Debug)]
 pub struct ScanExec {
-    pub source_paths: Vec<String>,
+    pub table: Arc<dyn TableProvider>
 }
 
 impl ScanExec {
-    pub fn new(source_paths: Vec<String>) -> Self {
-        ScanExec { source_paths }
+    pub fn new(table: Arc<dyn TableProvider>) -> Self {
+        ScanExec { table }
     }
 }
 

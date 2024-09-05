@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::expr::Expression;
+use crate::{datasource::TableProvider, expr::Expression};
 
 #[derive(Debug)]
 pub enum LogicalPlan {
@@ -30,7 +30,7 @@ impl LogicalPlan {
                 LogicalPlan::Sort(_) => todo!(),
                 LogicalPlan::Join(_) => todo!(),
                 LogicalPlan::Scan(scan) => {
-                    pp(format!("Scan {:?}", scan.source_paths), level);
+                    pp(format!("Scan {:?}", &scan.table), level);
                 }
                 LogicalPlan::Limit(_) => todo!(),
             }
@@ -75,7 +75,7 @@ pub struct Join {}
 
 #[derive(Debug)]
 pub struct Scan {
-    pub source_paths: Vec<String>,
+    pub table: Arc<dyn TableProvider>
 }
 
 #[derive(Debug)]
@@ -99,7 +99,7 @@ pub mod helpers {
         Arc::new(LogicalPlan::Filter(Filter { expr, input }))
     }
 
-    pub fn scan(source_paths: Vec<String>) -> Arc<LogicalPlan> {
-        Arc::new(LogicalPlan::Scan(Scan { source_paths }))
+    pub fn scan(table: Arc<dyn TableProvider>) -> Arc<LogicalPlan> {
+        Arc::new(LogicalPlan::Scan(Scan { table }))
     }
 }
