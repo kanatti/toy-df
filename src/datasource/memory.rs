@@ -3,7 +3,10 @@ use std::{fmt::Display, sync::Arc};
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
 
-use crate::{error::Result, physical_plan::plan::ExecutionPlan};
+use crate::{
+    error::Result,
+    physical_plan::{memory::MemoryExec, plan::ExecutionPlan},
+};
 
 use super::TableProvider;
 
@@ -18,7 +21,11 @@ pub struct MemTable {
 impl MemTable {
     // TODO: Validate RecordBatches against schema.
     pub fn new(schema: SchemaRef, data: Vec<RecordBatch>, description: Option<String>) -> Self {
-        Self { schema, data, description }
+        Self {
+            schema,
+            data,
+            description,
+        }
     }
 }
 
@@ -26,9 +33,11 @@ impl TableProvider for MemTable {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
-    
+
     fn scan(&self) -> Result<Arc<dyn ExecutionPlan>> {
-        todo!()
+        Ok(Arc::new(MemoryExec {
+            data: self.data.clone(),
+        }))
     }
 }
 

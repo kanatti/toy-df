@@ -106,7 +106,7 @@ fn convert_to_plan(node: PhysicalNodeRef) -> Arc<dyn ExecutionPlan> {
 }
 
 pub fn convert_scan(scan: &logical_plan::Scan) -> Arc<dyn ExecutionPlan> {
-    return Arc::new(ScanExec::new(scan.table.clone()));
+    return scan.table.scan().unwrap();
 }
 
 pub fn convert_filter(

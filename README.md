@@ -52,7 +52,8 @@ As a first milestone, we will try to get basic select + filter work end to end.
 - [x] DataFrame API
 - [x] LogicalPlan
 - [x] Execution Plan scaffolding
-- [ ] Parquet and arrow integration
+- [x] TableProvider and InMemory Table
+- [ ] CsvTable and ParquetTable
 - [ ] Physical Expression
 - [ ] Scan execution
 - [ ] Projection execution

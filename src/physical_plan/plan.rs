@@ -5,8 +5,10 @@ use arrow_schema::Schema;
 
 use crate::{datasource::TableProvider, error::Result, expr::Expression};
 
+pub type RecordBatchStream = Vec<RecordBatch>;
+
 pub trait ExecutionPlan: std::fmt::Debug {
-    fn execute(&self) -> Result<RecordBatch>;
+    fn execute(&self) -> Result<RecordBatchStream>;
 }
 
 pub enum ExecutionError {}
@@ -23,8 +25,10 @@ impl ScanExec {
 }
 
 impl ExecutionPlan for ScanExec {
-    fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
+    fn execute(&self) -> Result<RecordBatchStream> {
+        Ok(vec![
+            RecordBatch::new_empty(Arc::new(Schema::empty()))
+        ])
     }
 }
 
@@ -41,8 +45,10 @@ impl FilterExec {
 }
 
 impl ExecutionPlan for FilterExec {
-    fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
+    fn execute(&self) -> Result<RecordBatchStream> {
+        Ok(vec![
+            RecordBatch::new_empty(Arc::new(Schema::empty()))
+        ])
     }
 }
 
@@ -59,7 +65,9 @@ impl ProjectionExec {
 }
 
 impl ExecutionPlan for ProjectionExec {
-    fn execute(&self) -> Result<RecordBatch> {
-        Ok(RecordBatch::new_empty(Arc::new(Schema::empty())))
+    fn execute(&self) -> Result<RecordBatchStream> {
+        Ok(vec![
+            RecordBatch::new_empty(Arc::new(Schema::empty()))
+        ])
     }
 }

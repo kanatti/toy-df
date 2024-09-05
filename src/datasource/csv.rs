@@ -2,13 +2,16 @@ use std::{fmt::Display, sync::Arc};
 
 use arrow_schema::SchemaRef;
 
-use crate::{error::Result, physical_plan::plan::ExecutionPlan};
+use crate::{
+    error::Result,
+    physical_plan::{csv::CsvExec, plan::ExecutionPlan},
+};
 
 use super::TableProvider;
 
 pub struct CsvReadOptions {
     pub has_header: bool,
-    pub schema: Option<SchemaRef>
+    pub schema: Option<SchemaRef>,
 }
 
 impl CsvReadOptions {
@@ -26,9 +29,9 @@ impl TableProvider for CsvTable {
     fn schema(&self) -> SchemaRef {
         todo!()
     }
-    
+
     fn scan(&self) -> Result<Arc<dyn ExecutionPlan>> {
-        todo!()
+        Ok(Arc::new(CsvExec {}))
     }
 }
 
