@@ -14,10 +14,15 @@ fn main() {
         Field::new("age", DataType::Int16, false),
     ]);
 
-    let mem_table = MemTable::new(Arc::new(schema), vec![]);
+    let mem_table = MemTable::new(
+        Arc::new(schema),
+        vec![],
+        Some("Users: [alias, age, name]".to_string()),
+    );
 
     // Register in-memory table.
-    ctx.register_table("users".to_string(), Arc::new(mem_table)).unwrap();
+    ctx.register_table("users".to_string(), Arc::new(mem_table))
+        .unwrap();
 
     // DataFrame wrapped on in-memory table
     let mut df = ctx.table("users".to_string()).unwrap();

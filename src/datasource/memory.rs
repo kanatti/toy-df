@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
@@ -11,13 +11,14 @@ use super::TableProvider;
 #[derive(Debug)]
 pub struct MemTable {
     schema: SchemaRef,
-    data: Vec<RecordBatch>
+    data: Vec<RecordBatch>,
+    description: Option<String>,
 }
 
 impl MemTable {
     // TODO: Validate RecordBatches against schema.
-    pub fn new(schema: SchemaRef, data: Vec<RecordBatch>) -> Self {
-        Self { schema, data }
+    pub fn new(schema: SchemaRef, data: Vec<RecordBatch>, description: Option<String>) -> Self {
+        Self { schema, data, description }
     }
 }
 
@@ -28,5 +29,16 @@ impl TableProvider for MemTable {
     
     fn scan(&self) -> Result<Arc<dyn ExecutionPlan>> {
         todo!()
+    }
+}
+
+impl Display for MemTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MemTable")?;
+        if let Some(description) = &self.description {
+            write!(f, " ({description})")
+        } else {
+            Ok(())
+        }
     }
 }

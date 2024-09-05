@@ -28,7 +28,7 @@ fn main() {
 
     // Filter BinaryExpression(BinaryExpression { left: Column(Column { name: "age" }), right: Literal(Int32(Some(30))), op: GreaterThan })
     //   Projection [Column(Column { name: "name" }), Column(Column { name: "age" })]
-    //     Scan CsvTable { source_paths: ["/Users/kanatti/Code/toy-df/examples/data.csv"] }
+    //     Scan CSV: [/Users/kanatti/Code/toy-df/examples/data.csv]
 
     df.logical_plan().describe();
 

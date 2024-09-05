@@ -30,7 +30,7 @@ impl LogicalPlan {
                 LogicalPlan::Sort(_) => todo!(),
                 LogicalPlan::Join(_) => todo!(),
                 LogicalPlan::Scan(scan) => {
-                    pp(format!("Scan {:?}", &scan.table), level);
+                    pp(format!("Scan {}", &scan.table), level);
                 }
                 LogicalPlan::Limit(_) => todo!(),
             }

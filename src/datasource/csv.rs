@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use arrow_schema::SchemaRef;
 
@@ -29,5 +29,11 @@ impl TableProvider for CsvTable {
     
     fn scan(&self) -> Result<Arc<dyn ExecutionPlan>> {
         todo!()
+    }
+}
+
+impl Display for CsvTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CSV: [{}]", self.source_paths.join(", "))
     }
 }
