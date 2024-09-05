@@ -51,8 +51,12 @@ As a first milestone, we will try to get basic select + filter work end to end.
 - [x] Expressions
 - [x] DataFrame API
 - [x] LogicalPlan
-- [ ] Execution Plan scaffolding
+- [x] Execution Plan scaffolding
 - [ ] Parquet and arrow integration
+- [ ] Physical Expression
 - [ ] Scan execution
 - [ ] Projection execution
 - [ ] Filter execution
+- [ ] Aggregate execution
+- [ ] Join Execution
+- [ ] Async and Streams

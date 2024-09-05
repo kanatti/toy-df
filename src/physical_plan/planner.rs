@@ -85,7 +85,6 @@ fn physical_node_ref(
     }))
 }
 
-// TODO: Actual conversion logic.
 fn convert_to_plan(node: PhysicalNodeRef) -> Arc<dyn ExecutionPlan> {
     let node = node.borrow();
     match node.logical_plan.as_ref() {
