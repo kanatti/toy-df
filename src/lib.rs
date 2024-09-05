@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use error::Result;
 use expr::Expression;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 use physical_plan::planner::PhysicalPlanner;
@@ -9,6 +10,8 @@ pub mod expr;
 pub mod logical_plan;
 pub mod physical_plan;
 pub mod prelude;
+pub mod table;
+pub mod error;
 
 /// SessionContext is the entry point toy-df.
 pub struct SessionContext {}
@@ -76,8 +79,3 @@ impl DataFrame {
         Arc::clone(&self.plan)
     }
 }
-
-#[derive(Debug)]
-pub struct QueryEngineError {}
-
-pub type Result<T> = std::result::Result<T, QueryEngineError>;

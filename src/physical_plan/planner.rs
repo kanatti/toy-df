@@ -1,10 +1,8 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use crate::logical_plan::{self, LogicalPlan};
+use crate::{error::{Result, ToyDfError}, logical_plan::{self, LogicalPlan}};
 
 use super::plan::{ExecutionPlan, FilterExec, ProjectionExec, ScanExec};
-
-pub type Result<T> = std::result::Result<T, PlannerError>;
 
 pub struct PhysicalPlanner {}
 
@@ -56,7 +54,7 @@ impl PhysicalPlanner {
             }
         }
 
-        root_plan.map_or(Err(PlannerError {}), |plan| Ok(plan))
+        root_plan.map_or(Err(ToyDfError::PlanError), |plan| Ok(plan))
     }
 }
 

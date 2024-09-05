@@ -1,8 +1,6 @@
-use std::{result, sync::Arc};
+use std::sync::Arc;
 
-use crate::expr::Expression;
-
-pub type Result<T> = result::Result<T, ExecutionError>;
+use crate::{error::Result, expr::Expression};
 
 pub trait ExecutionPlan: std::fmt::Debug {
     fn execute(&self) -> Result<RecordBatch>;
