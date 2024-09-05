@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{datasource::TableProvider, expr::Expression};
+use crate::{datasource::TableProvider, expr::Expr};
 
 #[derive(Debug)]
 pub enum LogicalPlan {
@@ -54,13 +54,13 @@ impl LogicalPlan {
 
 #[derive(Debug)]
 pub struct Projection {
-    pub exprs: Vec<Expression>,
+    pub exprs: Vec<Expr>,
     pub input: Arc<LogicalPlan>,
 }
 
 #[derive(Debug)]
 pub struct Filter {
-    pub expr: Expression,
+    pub expr: Expr,
     pub input: Arc<LogicalPlan>,
 }
 
@@ -91,11 +91,11 @@ fn pp(message: String, level: usize) {
 pub mod helpers {
     use super::*;
 
-    pub fn projection(exprs: Vec<Expression>, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+    pub fn projection(exprs: Vec<Expr>, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
         Arc::new(LogicalPlan::Projection(Projection { exprs, input }))
     }
 
-    pub fn filter(expr: Expression, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+    pub fn filter(expr: Expr, input: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
         Arc::new(LogicalPlan::Filter(Filter { expr, input }))
     }
 

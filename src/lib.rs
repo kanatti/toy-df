@@ -5,7 +5,7 @@ use datasource::{
     TableProvider,
 };
 use error::{Result, ToyDfError};
-use expr::Expression;
+use expr::Expr;
 use logical_plan::{Filter, LogicalPlan, Projection, Scan};
 use physical_plan::planner::PhysicalPlanner;
 
@@ -77,7 +77,7 @@ pub struct DataFrame {
 }
 
 impl DataFrame {
-    pub fn select(self, exprs: Vec<Expression>) -> DataFrame {
+    pub fn select(self, exprs: Vec<Expr>) -> DataFrame {
         DataFrame {
             plan: Arc::new(LogicalPlan::Projection(Projection {
                 input: self.plan,
@@ -86,7 +86,7 @@ impl DataFrame {
         }
     }
 
-    pub fn filter(self, expr: Expression) -> DataFrame {
+    pub fn filter(self, expr: Expr) -> DataFrame {
         DataFrame {
             plan: Arc::new(LogicalPlan::Filter(Filter {
                 input: self.plan,
@@ -98,7 +98,8 @@ impl DataFrame {
     pub fn show(&self) {
         let planner = PhysicalPlanner::new();
         let physical_plan = planner.create_physical_plan(Arc::clone(&self.plan));
-        println!("{:#?}", physical_plan);
+        let results = physical_plan.unwrap().execute();
+        println!("{:?}", results);
     }
 
     pub fn logical_plan(&self) -> Arc<LogicalPlan> {

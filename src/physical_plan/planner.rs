@@ -5,7 +5,7 @@ use crate::{
     logical_plan::{self, LogicalPlan},
 };
 
-use super::plan::{ExecutionPlan, FilterExec, ProjectionExec, ScanExec};
+use super::plan::{ExecutionPlan, FilterExec, ProjectionExec};
 
 pub struct PhysicalPlanner {}
 
