@@ -1,0 +1,11 @@
+[package]
+name = "toy-df"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow = "53.0.0"
+arrow-schema = "53.0.0"
+
+[profile.dev]
+incremental = true
