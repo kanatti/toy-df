@@ -2423,6 +2423,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "toy-arrow"
+version = "0.1.0"
+
+[[package]]
 name = "toy-df"
 version = "0.1.0"
 dependencies = [
