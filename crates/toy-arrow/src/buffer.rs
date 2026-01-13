@@ -95,6 +95,24 @@ impl Buffer {
         }
     }
 
+    pub fn from_u8_slice(values: &[u8]) -> Self {
+        let capacity = values.len();
+        let mut inner = BufferInner::new(capacity, 1);
+
+        unsafe {
+            let u8_ptr = inner.ptr.as_ptr() as *mut u8;
+            for (i, &value) in values.iter().enumerate() {
+                u8_ptr.add(i).write(value);
+            }
+        }
+
+        inner.len = capacity;
+
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+
     pub fn as_i32_slice(&self) -> &[i32] {
         assert_eq!(self.inner.len % 4, 0, "Buffer length not divisible by 4");
         assert_eq!(
@@ -108,5 +126,73 @@ impl Buffer {
 
     pub fn len(&self) -> usize {
         self.inner.len
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_i32_slice() {
+        let values = vec![1i32, 2, 3, 4, 5];
+        let buffer = Buffer::from_i32_slice(&values);
+
+        assert_eq!(buffer.len(), 20); // 5 * 4 bytes
+        assert_eq!(buffer.as_i32_slice(), &values[..]);
+    }
+
+    #[test]
+    fn test_from_u8_slice() {
+        let values = vec![0u8, 1, 2, 3, 255];
+        let buffer = Buffer::from_u8_slice(&values);
+
+        assert_eq!(buffer.len(), 5);
+        assert_eq!(buffer.as_slice(), &values[..]);
+    }
+
+    #[test]
+    fn test_buffer_alignment_i32() {
+        let values = vec![100i32, 200, 300];
+        let buffer = Buffer::from_i32_slice(&values);
+
+        let ptr = buffer.as_slice().as_ptr() as usize;
+        assert_eq!(ptr % 4, 0, "Buffer should be 4-byte aligned for i32");
+    }
+
+    #[test]
+    fn test_buffer_clone_shares_memory() {
+        let values = vec![42i32, 84, 126];
+        let buffer1 = Buffer::from_i32_slice(&values);
+        let buffer2 = buffer1.clone();
+
+        // Same data
+        assert_eq!(buffer1.as_i32_slice(), buffer2.as_i32_slice());
+
+        // Same pointer (shared memory)
+        assert_eq!(
+            buffer1.as_slice().as_ptr(),
+            buffer2.as_slice().as_ptr()
+        );
+    }
+
+    #[test]
+    fn test_buffer_empty() {
+        let buffer = Buffer::with_capacity(10, 1);
+        assert_eq!(buffer.len(), 0);
+        assert_eq!(buffer.as_slice().len(), 0);
+    }
+
+    #[test]
+    fn test_i32_slice_misaligned_panics() {
+        // Create a u8 buffer with odd length (not divisible by 4)
+        let values = vec![1u8, 2, 3];
+        let buffer = Buffer::from_u8_slice(&values);
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = buffer.as_i32_slice();
+        }));
+
+        assert!(result.is_err(), "Should panic on misaligned i32 access");
     }
 }

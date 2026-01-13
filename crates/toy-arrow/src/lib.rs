@@ -3,10 +3,10 @@
 use std::marker::PhantomData;
 
 pub mod buffer;
+pub mod null;
 
 pub use buffer::Buffer;
-
-pub struct NullBuffer {}
+pub use null::NullBuffer;
 
 pub struct PrimitiveArray<T> {
     values: Buffer,
