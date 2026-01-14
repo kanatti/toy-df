@@ -60,7 +60,7 @@ impl NullBuffer {
 }
 
 fn is_null_bit(buffer: &Buffer, idx: usize) -> bool {
-    let byte = buffer.as_slice()[idx / 8];
+    let byte = buffer.as_u8_slice()[idx / 8];
     // (1 << (idx % 8)) -> mask with idx set
     (byte & (1 << (idx % 8))) == 0
 }
