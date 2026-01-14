@@ -20,15 +20,25 @@ This roadmap follows the dependency hierarchy of arrow-rs, starting from the mos
 
 **Crate**: `arrow-buffer`
 
-### 1.1 Raw Buffer Fundamentals
+Maps to arrow-rs structure:
+- `buffer/` - Buffer types (immutable, mutable, scalar, boolean, null, offset, run, ops)
+- `builder/` - Buffer builders
+- `native.rs` - ArrowNativeType trait
+- `alloc/` - Allocation infrastructure
+- `util/` - Bit manipulation utilities
+- `bytes.rs` - Internal Bytes struct (like our BufferInner)
+
+---
+
+### 1.1 Raw Buffer Fundamentals (`bytes.rs` / `BufferInner`)
 - [x] Understanding alignment requirements for typed access
 - [x] Why `Vec<u8>` is insufficient (alignment guarantees)
 - [x] Custom allocation with `std::alloc::Layout`
 - [x] `NonNull<u8>` for pointer safety
 - [x] Memory safety: proper deallocation with `Layout`
 
-**Concepts to implement**:
 ```rust
+// Our BufferInner (arrow-rs calls this Bytes)
 struct BufferInner {
     ptr: NonNull<u8>,
     len: usize,
@@ -42,54 +52,171 @@ struct BufferInner {
 - How does alignment affect SIMD vectorization?
 - What's the contract between `alloc()` and `dealloc()`?
 
-### 1.2 Shared Ownership Pattern
+---
+
+### 1.2 Immutable Buffer (`buffer/immutable.rs`)
 - [x] `Arc<BufferInner>` for reference counting
-- [ ] Zero-copy slicing (offset + length tracking) - **No slice() method yet**
+- [x] Zero-copy slicing (offset + length tracking)
 - [x] Clone without data copy
 - [x] Drop behavior with last reference
+- [x] `slice(offset, len)` method
+- [ ] `is_empty()` method
+- [ ] `ptr_eq()` for pointer comparison
+- [ ] `shrink_to_fit()` to free unused memory
 
-**Implementation Challenge**: Make `Buffer::clone()` O(1) with shared memory
+---
 
-### 1.3 Typed Buffer Wrappers
-- [ ] `ScalarBuffer<T>`: Type-safe fixed-size primitives (methods exist on Buffer, not separate type)
-- [x] Conversion between `Vec<T>` and `Buffer` (i32 and u8 only)
-- [x] Zero-copy reinterpretation with alignment checks (i32 only)
-- [ ] Generic `as_slice<T>()` for typed access - **Only specific: as_i32_slice(), as_slice() for u8**
+### 1.3 Mutable Buffer (`buffer/mutable.rs`)
+- [ ] `MutableBuffer`: Growing buffer during construction
+- [ ] `with_capacity()` pre-allocation
+- [ ] `push()`, `extend_from_slice()` for appending
+- [ ] `reserve()` for capacity management
+- [ ] `into_buffer()` conversion to immutable `Buffer`
+- [ ] `freeze()` pattern (mutable → immutable)
 
-**Key Design**: How to guarantee type safety over raw bytes?
+**Pattern**: Mutable construction → immutable use
 
-### 1.4 Boolean Buffer (Bit-Packing)
-- [x] Bit-level storage (1 bit per boolean)
-- [ ] Bit manipulation: `get_bit()`, `set_bit()`, `count_ones()`
-  - [x] Read bits via `is_null_bit()` helper
-  - [ ] `set_bit()` not implemented
-  - [ ] Efficient `count_ones()` using CPU intrinsics (currently loop-based)
-- [x] Efficient null masks (1 bit per element)
-- [ ] Bitwise operations: AND, OR, NOT
+---
+
+### 1.4 ArrowNativeType Trait (`native.rs`)
+- [ ] Sealed trait for safe primitive types
+- [ ] Implemented for: i8, i16, i32, i64, u8, u16, u32, u64, f32, f64
+- [ ] `get_byte_width()` method
+- [ ] `from_usize()`, `to_usize()` conversions
+- [ ] Enables generic `ScalarBuffer<T>` and typed access
+
+```rust
+pub trait ArrowNativeType: Debug + Send + Sync + Copy + 'static {
+    fn get_byte_width() -> usize;
+    // ...
+}
+```
+
+**Key Design**: Sealed trait prevents external implementations, ensuring safety
+
+---
+
+### 1.5 ScalarBuffer<T> (`buffer/scalar.rs`)
+- [ ] Type-safe wrapper over `Buffer`
+- [ ] Generic over `ArrowNativeType`
+- [ ] `slice()` returns typed slice
+- [ ] `Deref` to `&[T]` for easy access
+- [ ] Zero-copy conversion from `Vec<T>`
+
+```rust
+pub struct ScalarBuffer<T: ArrowNativeType> {
+    buffer: Buffer,
+    phantom: PhantomData<T>,
+}
+```
+
+**Replaces**: Our current `as_i32_slice()`, `as_u8_slice()` with generic approach
+
+---
+
+### 1.6 BooleanBuffer (`buffer/boolean.rs`)
+- [ ] Bit-packed boolean storage (1 bit per value)
+- [ ] Separate from NullBuffer (this is for boolean array values)
+- [ ] `len()` in bits, not bytes
+- [ ] `value(i)` / `is_set(i)` to read individual bits
+- [ ] `set_bit()`, `unset_bit()` for mutation (via builder)
+- [ ] `count_set_bits()` efficient counting
+- [ ] Slicing with bit offset support
 
 **Space Efficiency**: 8x memory savings vs byte-per-bool
 
-### 1.5 Specialized Buffers
-- [x] `NullBuffer`: Basic validity bitmap with cached null count
-  - [x] Convention: `true` = valid, `false` = null (implemented)
-  - [x] `null_count()` in O(1) (cached on construction)
-  - [x] `is_null(idx)` method
-  - [x] `from_bools()` constructor with bit-packing
-  - [ ] Union operations for combining null masks
-  - [ ] Efficient construction from iterators
-- [ ] `OffsetBuffer<T>`: For variable-length types
-  - Validates monotonic increasing offsets
-  - Bounds checking
-- [ ] `RunEndBuffer<T>`: For run-length encoding
-  - Stores indices where runs end
+---
 
-### 1.6 Mutable Builders
-- [ ] `MutableBuffer`: Growing buffer during construction
-- [ ] `BooleanBufferBuilder`: Accumulates bits
-- [ ] `NullBufferBuilder`: Tracks validity during append
-- [ ] Conversion to immutable buffers
+### 1.7 NullBuffer (`buffer/null.rs`)
+- [x] Validity bitmap with cached null count
+- [x] Convention: `true` = valid, `false` = null
+- [x] `null_count()` in O(1) (cached on construction)
+- [x] `is_null(idx)` method
+- [x] `from_bools()` constructor with bit-packing
+- [ ] `union()` / `intersect()` operations for combining masks
+- [ ] Efficient construction from iterators
+- [ ] `contains_nulls()` quick check
 
-**Pattern**: Mutable construction → immutable use
+---
+
+### 1.8 OffsetBuffer<T> (`buffer/offset.rs`)
+- [ ] For variable-length types (strings, lists)
+- [ ] Generic over offset type (i32 for regular, i64 for Large variants)
+- [ ] Validates monotonically increasing offsets
+- [ ] `lengths()` iterator over element lengths
+- [ ] Bounds checking on construction
+
+```rust
+pub struct OffsetBuffer<T: ArrowNativeType>(ScalarBuffer<T>);
+```
+
+---
+
+### 1.9 RunEndBuffer<T> (`buffer/run.rs`)
+- [ ] For run-length encoding
+- [ ] Stores indices where runs end
+- [ ] `get_physical_index()` to map logical → physical
+- [ ] `get_run_end()` for a given index
+
+---
+
+### 1.10 Buffer Operations (`buffer/ops.rs`)
+- [ ] `buffer_bin_and()` - bitwise AND
+- [ ] `buffer_bin_or()` - bitwise OR
+- [ ] `buffer_bin_xor()` - bitwise XOR
+- [ ] `buffer_unary_not()` - bitwise NOT
+- [ ] Operations on boolean/null buffers
+
+---
+
+### 1.11 Bit Utilities (`util/`)
+- [ ] `bit_util.rs`: `get_bit()`, `set_bit()`, `ceil()`, `round_upto_multiple_of_64()`
+- [ ] `bit_mask.rs`: Creating bit masks
+- [ ] `bit_iterator.rs`: `BitIterator` for iterating over bits
+- [ ] `bit_chunk_iterator.rs`: `BitChunks` for 64-bit chunk iteration (SIMD friendly)
+
+---
+
+### 1.12 Buffer Builders (`builder/`)
+
+**BufferBuilder<T>** (`builder/mod.rs`):
+- [ ] Generic builder for `ScalarBuffer<T>`
+- [ ] `append()`, `append_slice()`, `append_n()`
+- [ ] `finish()` → `ScalarBuffer<T>`
+
+**BooleanBufferBuilder** (`builder/boolean.rs`):
+- [ ] Bit-level append operations
+- [ ] `append()`, `append_n()`, `append_slice()`
+- [ ] `finish()` → `BooleanBuffer`
+
+**NullBufferBuilder** (`builder/null.rs`):
+- [ ] Tracks validity during construction
+- [ ] `append_null()`, `append_non_null()`, `append_n()`
+- [ ] `finish()` → `Option<NullBuffer>` (None if all valid)
+
+**OffsetBufferBuilder** (`builder/offset.rs`):
+- [ ] Builds offset arrays for variable-length types
+- [ ] `push_length()` to add element lengths
+- [ ] `finish()` → `OffsetBuffer<T>`
+
+---
+
+### 1.13 Allocation Infrastructure (`alloc/`)
+- [x] Custom allocation with `Layout` (in BufferInner)
+- [ ] `ALIGNMENT` constant (64 bytes for SIMD)
+- [ ] `Deallocation` enum (Standard vs Custom/FFI)
+- [ ] `Allocation` trait for custom allocators
+
+**Skip for learning**: FFI allocation support (Custom variant)
+
+---
+
+### 1.14 Specialized Types (Optional)
+- [ ] `i256` (`bigint/`) - 256-bit integer for Decimal256
+- [ ] `IntervalMonthDayNano`, `IntervalDayTime` (`interval.rs`)
+- [ ] Checked/wrapping arithmetic macros (`arith.rs`)
+
+**Skip for learning**: These are domain-specific, implement if needed later
 
 ---
 
@@ -585,31 +712,46 @@ fn process_column(arr: &ArrayRef) {
 
 ## Implementation Roadmap
 
-### Phase 1: Foundation (COMPLETED)
-- [x] Buffer with alignment
-- [x] Arc-based sharing
+### Phase 1a: Buffer Foundation ✅
+- [x] BufferInner with custom allocation
+- [x] Buffer with Arc-based sharing
+- [x] Zero-copy slicing
 - [x] NullBuffer basics
-- [x] PrimitiveArray stub
 
-### Phase 2: Core Primitives
-- [ ] BooleanBuffer with bit manipulation
-- [ ] Complete NullBuffer (null_count caching, union)
-- [ ] DataType enum (start with primitives)
+### Phase 1b: Type System for Buffers (Current)
+- [ ] ArrowNativeType trait (sealed, for primitives)
+- [ ] ScalarBuffer<T> (generic typed buffer)
+- [ ] BooleanBuffer (bit-packed, separate from NullBuffer)
+- [ ] Bit utilities (get_bit, set_bit, iterators)
+
+### Phase 1c: Mutable Buffers & Builders
+- [ ] MutableBuffer (growable)
+- [ ] BufferBuilder<T>
+- [ ] BooleanBufferBuilder
+- [ ] NullBufferBuilder
+
+### Phase 1d: Specialized Buffers
+- [ ] OffsetBuffer<T> (for strings/lists)
+- [ ] OffsetBufferBuilder
+- [ ] RunEndBuffer<T> (for RLE)
+- [ ] Buffer bitwise operations (AND, OR, NOT)
+
+### Phase 2: Type System & Schema
+- [ ] DataType enum (primitives first)
 - [ ] Field and Schema basics
-- [ ] Complete PrimitiveArray<T> implementation
-- [ ] Int32Array, Float64Array type aliases
+- [ ] ArrowPrimitiveType trait (connects Rust types to DataType)
 
-### Phase 3: Variable-Length Types
-- [ ] OffsetBuffer with validation
+### Phase 3: Arrays
+- [ ] PrimitiveArray<T> implementation
+- [ ] BooleanArray
+- [ ] Int32Array, Float64Array type aliases
+- [ ] Array trait and ArrayRef
+
+### Phase 4: Variable-Length Arrays
 - [ ] GenericByteArray for strings
 - [ ] StringArray, BinaryArray
-- [ ] Basic builders (PrimitiveBuilder, StringBuilder)
-
-### Phase 4: Lists & Nesting
-- [ ] ArrayData structure
 - [ ] GenericListArray
-- [ ] Recursive building pattern
-- [ ] Multi-level null handling
+- [ ] ArrayData structure
 
 ### Phase 5: Advanced Arrays
 - [ ] StructArray
@@ -618,7 +760,6 @@ fn process_column(arr: &ArrayRef) {
 - [ ] RunEndEncoded arrays
 
 ### Phase 6: Operations
-- [ ] Array trait and ArrayRef
 - [ ] Basic compute kernels (arithmetic)
 - [ ] Filter and Take
 - [ ] RecordBatch
@@ -626,7 +767,6 @@ fn process_column(arr: &ArrayRef) {
 ### Phase 7: I/O
 - [ ] Arrow IPC format
 - [ ] CSV reader
-- [ ] Simple serialization
 
 ---
 
@@ -663,29 +803,40 @@ fn process_column(arr: &ArrayRef) {
 
 ## Current Status
 
-**Phase 1: Foundation** - Partial Progress (≈60% complete)
+**Layer 1: Memory Management & Buffers** - In Progress
 
-✅ **Completed**:
-- Buffer with custom allocation (Layout, NonNull, alignment)
-- Arc-based sharing (clone without copy, shared memory)
-- NullBuffer basics (bit-packing, cached null_count, is_null, from_bools)
-- Specific typed access (as_i32_slice with alignment checks)
-- PrimitiveArray stub (structure defined)
+### ✅ Completed (1.1, 1.2, 1.7 partial)
+- **BufferInner** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation
+- **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy
+- **NullBuffer** (1.7): Bit-packing, cached null_count, is_null, from_bools
 
-🚧 **Not Yet Implemented**:
-- Zero-copy Buffer slicing (slice() method)
-- Generic typed buffer access (only i32/u8 specific)
-- Efficient bit counting (using CPU intrinsics)
-- Mutable bit operations (set_bit)
-- Bitwise operations on buffers (AND, OR, NOT, union)
-- OffsetBuffer, RunEndBuffer
-- Mutable buffer builders
+### 🚧 In Progress
+- Specific typed access exists (`as_i32_slice`, `as_u8_slice`) but not generic
 
-**Next Up**:
-- Option 1: Complete remaining Phase 1 items (slicing, bitwise ops, builders)
-- Option 2: Move to Phase 2 (DataType, PrimitiveArray implementation)
+### 📋 Not Yet Implemented
+| Section | Items |
+|---------|-------|
+| 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
+| 1.3 MutableBuffer | Entire section |
+| 1.4 ArrowNativeType | Entire section (key for generics) |
+| 1.5 ScalarBuffer<T> | Entire section (replaces specific typed access) |
+| 1.6 BooleanBuffer | Entire section |
+| 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
+| 1.8 OffsetBuffer | Entire section |
+| 1.9 RunEndBuffer | Entire section |
+| 1.10 Buffer Ops | AND, OR, XOR, NOT |
+| 1.11 Bit Utilities | `get_bit()`, `set_bit()`, iterators |
+| 1.12 Builders | All builders |
+| 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
 
-**Test Status**: 9/9 tests passing ✅
+### Recommended Next Steps
+1. **ArrowNativeType trait** (1.4) - Unlocks generic typed access
+2. **ScalarBuffer<T>** (1.5) - Clean up typed buffer access
+3. **BooleanBuffer** (1.6) - Needed for BooleanArray values
+4. **MutableBuffer** (1.3) - Needed for builders
+5. **Builders** (1.12) - Construction patterns
+
+**Test Status**: 14/14 tests passing ✅
 
 ---
 
