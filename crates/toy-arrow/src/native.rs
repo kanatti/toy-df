@@ -12,6 +12,10 @@ pub trait NativeType: private::Sealed + Copy + Send + Sync + 'static {
     fn get_byte_width() -> usize {
         std::mem::size_of::<Self>()
     }
+
+    fn get_alignment() -> usize {
+        std::mem::align_of::<Self>()
+    }
 }
 
 macro_rules! impl_native_type {

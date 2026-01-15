@@ -98,7 +98,7 @@ impl Buffer {
         self.length
     }
 
-    fn ptr(&self) -> *const u8 {
+    pub fn ptr(&self) -> *const u8 {
         self.inner.offset_ptr(self.offset)
     }
 }
