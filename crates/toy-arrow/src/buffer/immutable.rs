@@ -5,6 +5,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::native::NativeType;
+
 /// A contiguous memory region holding raw bytes.
 ///
 /// Uses Arc<BufferInner> pattern to support both cheap cloning and automatic cleanup:
@@ -15,9 +17,9 @@ use std::{
 /// Without Arc, we'd face double-free on clone or expensive deep copies.
 #[derive(Clone)]
 pub struct Buffer {
-    inner: Arc<BufferInner>,
-    offset: usize,
-    length: usize,
+    inner: Arc<BufferInner>, // actual data
+    offset: usize,           // offset to start from inner buffer
+    length: usize,           // number of bytes
 }
 
 impl Buffer {
@@ -103,6 +105,21 @@ impl Buffer {
     }
 }
 
+impl<T: NativeType> From<Vec<T>> for Buffer {
+    fn from(value: Vec<T>) -> Self {
+        let ptr = NonNull::new(value.as_ptr() as _).unwrap();
+        let length = value.len() * T::get_byte_width();
+        let layout = Layout::array::<T>(value.capacity()).unwrap();
+        let inner = Arc::new(BufferInner::from_raw_parts(ptr, length, layout));
+        std::mem::forget(value);
+        Self {
+            inner,
+            offset: 0,
+            length,
+        }
+    }
+}
+
 /// Inner buffer holding the actual allocated memory.
 ///
 /// We use custom allocation to guarantee proper alignment for typed access.
@@ -135,6 +152,15 @@ impl BufferInner {
             ptr,
             length: 0,
             capacity,
+            layout,
+        }
+    }
+
+    fn from_raw_parts(ptr: NonNull<u8>, length: usize, layout: Layout) -> BufferInner {
+        Self {
+            ptr,
+            length,
+            capacity: layout.size(),
             layout,
         }
     }

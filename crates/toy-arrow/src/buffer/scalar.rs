@@ -24,6 +24,12 @@ impl<T: NativeType> From<Buffer> for ScalarBuffer<T> {
     }
 }
 
+impl<T: NativeType> From<Vec<T>> for ScalarBuffer<T> {
+    fn from(values: Vec<T>) -> ScalarBuffer<T> {
+        Buffer::from(values).into()
+    }
+}
+
 impl<T: NativeType> Deref for ScalarBuffer<T> {
     type Target = [T];
 
@@ -78,5 +84,15 @@ mod tests {
         let buffer = Buffer::from_u8_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
         let sliced = buffer.slice(1, 4); // offset 1 = misaligned for i32
         let _: ScalarBuffer<i32> = sliced.into();
+    }
+
+    #[test]
+    fn test_from_vec() {
+        let scalar: ScalarBuffer<i32> = vec![1, 2, 3].into();
+        assert_eq!(&*scalar, &[1, 2, 3]);
+        assert_eq!(scalar.len(), 3);
+
+        let scalar: ScalarBuffer<f64> = vec![1.5, 2.5].into();
+        assert_eq!(&*scalar, &[1.5, 2.5]);
     }
 }
