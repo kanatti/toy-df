@@ -801,6 +801,8 @@ fn process_column(arr: &ArrayRef) {
 5. Compare with arrow-rs approach
 ```
 
+**Important: Help user naturally understand concepts by asking questions and guiding simplified implementation without giving he solution directly.**
+
 ---
 
 ## Current Status

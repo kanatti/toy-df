@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+pub mod bit_util;
 pub mod buffer;
 pub mod native;
 

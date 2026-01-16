@@ -1,9 +1,11 @@
-use crate::Buffer;
+use crate::buffer::BooleanBuffer;
 
 /// A validity bitmap indicating which values in an array are null.
 ///
-/// Arrow uses bit-packing for space efficiency: 1 bit per element instead of 1 byte.
-/// This gives 8x memory savings (e.g., 125 bytes for 1000 elements vs 1000 bytes).
+/// Wraps a [`BooleanBuffer`] and adds a cached null count. The underlying storage
+/// is identical - both are bit-packed. NullBuffer just provides:
+/// 1. Inverted semantics: `is_null()` returns true when bit is 0
+/// 2. Cached `null_count` for O(1) access (query engines check this constantly)
 ///
 /// ## Convention
 /// - Bit = 1 (true) → value is **valid** (not null)
@@ -16,9 +18,7 @@ use crate::Buffer;
 /// Packed:    0b00010101 = 21          (single byte)
 /// ```
 pub struct NullBuffer {
-    buffer: Buffer,
-    /// Number of logical elements (bits), not bytes.
-    len: usize,
+    buffer: BooleanBuffer,
     /// Cached count of null values. Computing this requires scanning all bits O(n),
     /// so we cache it at construction for O(1) access. Query engines frequently
     /// check if arrays have nulls, making this optimization worthwhile.
@@ -26,28 +26,24 @@ pub struct NullBuffer {
 }
 
 impl NullBuffer {
-    /// Creates a NullBuffer from a raw buffer and logical length.
+    /// Creates a NullBuffer from a BooleanBuffer.
     /// Scans the buffer to compute and cache the null count.
-    pub fn new(buffer: Buffer, len: usize) -> Self {
+    pub fn new(buffer: BooleanBuffer) -> Self {
         let mut null_count = 0;
-        for i in 0..len {
-            if is_null_bit(&buffer, i) {
+        for i in 0..buffer.len() {
+            if !buffer.value(i) {
                 null_count += 1;
             }
         }
 
-        Self {
-            buffer,
-            len,
-            null_count,
-        }
+        Self { buffer, null_count }
     }
 
     /// Creates a NullBuffer from a slice of booleans.
     /// `true` means valid, `false` means null.
     pub fn from_bools(bools: &[bool]) -> Self {
-        let buffer = Self::pack_bools(bools);
-        Self::new(buffer, bools.len())
+        let buffer = BooleanBuffer::from_bools(bools);
+        Self::new(buffer)
     }
 
     /// Returns the cached null count in O(1).
@@ -57,58 +53,13 @@ impl NullBuffer {
 
     /// Returns the number of logical elements (not bytes).
     pub fn len(&self) -> usize {
-        self.len
+        self.buffer.len()
     }
 
     /// Returns true if the value at `idx` is null (bit is 0).
     pub fn is_null(&self, idx: usize) -> bool {
-        assert!(idx < self.len, "index out of bounds");
-        is_null_bit(&self.buffer, idx)
+        !self.buffer.value(idx)
     }
-
-    /// Packs booleans into bytes, with least-significant bit first (LSB numbering).
-    ///
-    /// Example: `[true, false, true, true, false, false, true, false]`
-    /// ```text
-    /// Index:      0     1     2     3     4     5     6     7
-    /// Value:      1     0     1     1     0     0     1     0
-    /// Bit pos:    0     1     2     3     4     5     6     7  (LSB to MSB)
-    /// ```
-    /// Byte = 0b01001101 = 77
-    ///
-    /// Why LSB first? Arrow spec uses this convention. Bit 0 is the least significant bit.
-    fn pack_bools(bools: &[bool]) -> Buffer {
-        // Ceiling division: 8 bools need 1 byte, 9 bools need 2 bytes
-        let num_bytes = (bools.len() + 7) / 8;
-        let mut bytes = vec![0u8; num_bytes];
-
-        for (i, &is_valid) in bools.iter().enumerate() {
-            if is_valid {
-                // i / 8      → which byte contains bit i
-                // i % 8      → position within that byte (0-7)
-                // 1 << (i%8) → mask with only that bit set
-                // |=         → set the bit (OR preserves other bits)
-                bytes[i / 8] |= 1 << (i % 8);
-            }
-            // If !is_valid, leave bit as 0 (null)
-        }
-
-        Buffer::from_u8_slice(&bytes)
-    }
-}
-
-/// Checks if the bit at `idx` is 0 (null).
-///
-/// ```text
-/// To check bit 5 in byte 0b01001101:
-///   mask = 1 << 5 = 0b00100000
-///   byte & mask   = 0b00000000  (bit 5 is 0, so result is 0)
-///   result == 0   → true, it's null
-/// ```
-fn is_null_bit(buffer: &Buffer, idx: usize) -> bool {
-    let byte = buffer.as_u8_slice()[idx / 8];
-    let mask = 1 << (idx % 8);
-    (byte & mask) == 0
 }
 
 #[cfg(test)]
