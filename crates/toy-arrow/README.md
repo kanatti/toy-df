@@ -79,11 +79,12 @@ struct BufferInner {
 ---
 
 ### 1.4 ArrowNativeType Trait (`native.rs`)
-- [ ] Sealed trait for safe primitive types
-- [ ] Implemented for: i8, i16, i32, i64, u8, u16, u32, u64, f32, f64
-- [ ] `get_byte_width()` method
+- [x] Sealed trait for safe primitive types
+- [x] Implemented for: i8, i16, i32, i64, u8, u16, u32, u64, f32, f64
+- [x] `get_byte_width()` method
+- [x] `get_alignment()` method
 - [ ] `from_usize()`, `to_usize()` conversions
-- [ ] Enables generic `ScalarBuffer<T>` and typed access
+- [x] Enables generic `ScalarBuffer<T>` and typed access
 
 ```rust
 pub trait ArrowNativeType: Debug + Send + Sync + Copy + 'static {
@@ -97,11 +98,12 @@ pub trait ArrowNativeType: Debug + Send + Sync + Copy + 'static {
 ---
 
 ### 1.5 ScalarBuffer<T> (`buffer/scalar.rs`)
-- [ ] Type-safe wrapper over `Buffer`
-- [ ] Generic over `ArrowNativeType`
-- [ ] `slice()` returns typed slice
-- [ ] `Deref` to `&[T]` for easy access
-- [ ] Zero-copy conversion from `Vec<T>`
+- [x] Type-safe wrapper over `Buffer`
+- [x] Generic over `NativeType`
+- [x] `slice()` returns typed slice
+- [x] `Deref` to `&[T]` for easy access
+- [x] Zero-copy conversion from `Vec<T>`
+- [x] `Clone` for cheap copies
 
 ```rust
 pub struct ScalarBuffer<T: ArrowNativeType> {
@@ -805,21 +807,19 @@ fn process_column(arr: &ArrayRef) {
 
 **Layer 1: Memory Management & Buffers** - In Progress
 
-### ✅ Completed (1.1, 1.2, 1.7 partial)
-- **BufferInner** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation
-- **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy
+### ✅ Completed
+- **BufferInner** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation, from_raw_parts
+- **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy, From<Vec<T>>
+- **NativeType** (1.4): Sealed trait, get_byte_width(), get_alignment(), implemented for all primitives
+- **ScalarBuffer<T>** (1.5): Type-safe wrapper, Deref to &[T], slice(), From<Vec<T>>, Clone
 - **NullBuffer** (1.7): Bit-packing, cached null_count, is_null, from_bools
-
-### 🚧 In Progress
-- Specific typed access exists (`as_i32_slice`, `as_u8_slice`) but not generic
 
 ### 📋 Not Yet Implemented
 | Section | Items |
 |---------|-------|
 | 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
 | 1.3 MutableBuffer | Entire section |
-| 1.4 ArrowNativeType | Entire section (key for generics) |
-| 1.5 ScalarBuffer<T> | Entire section (replaces specific typed access) |
+| 1.4 NativeType | `from_usize()`, `to_usize()` conversions |
 | 1.6 BooleanBuffer | Entire section |
 | 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
 | 1.8 OffsetBuffer | Entire section |
@@ -830,13 +830,12 @@ fn process_column(arr: &ArrayRef) {
 | 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
 
 ### Recommended Next Steps
-1. **ArrowNativeType trait** (1.4) - Unlocks generic typed access
-2. **ScalarBuffer<T>** (1.5) - Clean up typed buffer access
-3. **BooleanBuffer** (1.6) - Needed for BooleanArray values
-4. **MutableBuffer** (1.3) - Needed for builders
-5. **Builders** (1.12) - Construction patterns
+1. **BooleanBuffer** (1.6) - Needed for BooleanArray values
+2. **MutableBuffer** (1.3) - Needed for builders
+3. **Builders** (1.12) - Construction patterns
+4. **Layer 2: Type System** - DataType, Schema, ArrowPrimitiveType
 
-**Test Status**: 14/14 tests passing ✅
+**Test Status**: 20/20 tests passing ✅
 
 ---
 

@@ -7,23 +7,49 @@ use std::{
 
 use crate::native::NativeType;
 
-/// A contiguous memory region holding raw bytes.
+/// An immutable, reference-counted buffer of raw bytes with support for zero-copy slicing.
 ///
-/// Uses Arc<BufferInner> pattern to support both cheap cloning and automatic cleanup:
-/// - Clone just increments Arc's refcount (no data copy)
-/// - Drop automatically frees memory from BufferInner when last reference is dropped
-/// - Multiple Buffers can safely share the same underlying memory
+/// ## Design
 ///
-/// Without Arc, we'd face double-free on clone or expensive deep copies.
+/// ```text
+/// Buffer A                    Buffer B (slice of A)
+/// ┌──────────────────┐        ┌──────────────────┐
+/// │ inner: Arc ──────┼───┐    │ inner: Arc ──────┼───┐
+/// │ offset: 0        │   │    │ offset: 4        │   │
+/// │ length: 12       │   │    │ length: 4        │   │
+/// └──────────────────┘   │    └──────────────────┘   │
+///                        │                           │
+///                        ▼                           │
+///                   BufferInner ◄────────────────────┘
+///                   ┌─────────────────────────────┐
+///                   │ ptr: ───► [bytes...12 total]│
+///                   │ layout: (size=12, align=4)  │
+///                   └─────────────────────────────┘
+/// ```
+///
+/// ## Why Arc<BufferInner>?
+///
+/// - **Cheap clone**: Just increments refcount, no data copy
+/// - **Safe sharing**: Multiple Buffers can reference the same memory
+/// - **Automatic cleanup**: Memory freed when last reference drops
+/// - **Zero-copy slicing**: Slices share the same BufferInner
+///
+/// Without Arc, we'd face double-free on clone or need expensive deep copies.
 #[derive(Clone)]
 pub struct Buffer {
-    inner: Arc<BufferInner>, // actual data
-    offset: usize,           // offset to start from inner buffer
-    length: usize,           // number of bytes
+    inner: Arc<BufferInner>,
+    /// Byte offset into BufferInner's allocation. Enables zero-copy slicing:
+    /// a slice is just a new Buffer with adjusted offset/length, sharing the same Arc.
+    offset: usize,
+    /// Number of bytes visible through this Buffer (may be less than BufferInner's capacity).
+    length: usize,
 }
 
 impl Buffer {
-    /// Creates an empty buffer with capacity allocated
+    /// Creates an empty buffer with pre-allocated capacity.
+    ///
+    /// Useful when you know the final size upfront and want to avoid reallocations.
+    /// The buffer starts with length 0 (no visible data) but has memory reserved.
     pub fn with_capacity(capacity: usize, alignment: usize) -> Self {
         Self {
             inner: Arc::new(BufferInner::new(capacity, alignment)),
@@ -32,20 +58,29 @@ impl Buffer {
         }
     }
 
+    /// Creates a zero-copy slice of this buffer.
+    ///
+    /// The returned Buffer shares the same underlying memory (via Arc clone).
+    /// No bytes are copied - only the offset and length change.
+    ///
+    /// ## Panics
+    /// Panics if `offset + length` exceeds this buffer's length.
     pub fn slice(&self, offset: usize, length: usize) -> Self {
         assert!(offset + length <= self.length);
         Self {
-            inner: self.inner.clone(),
+            inner: self.inner.clone(), // Arc clone = refcount increment, not data copy
             offset: self.offset + offset,
             length,
         }
     }
 
+    /// Creates a buffer from an i32 slice, copying the data.
+    ///
+    /// Allocates with 4-byte alignment to allow safe reinterpretation as &[i32].
     pub fn from_i32_slice(values: &[i32]) -> Self {
         let capacity = values.len() * 4;
         let mut inner = BufferInner::new(capacity, 4);
 
-        // Write the data into the buffer
         unsafe {
             let i32_ptr = inner.ptr.as_ptr() as *mut i32;
             for (i, &value) in values.iter().enumerate() {
@@ -53,7 +88,6 @@ impl Buffer {
             }
         }
 
-        // Update length to reflect written data
         inner.length = capacity;
 
         Self {
@@ -63,6 +97,9 @@ impl Buffer {
         }
     }
 
+    /// Creates a buffer from a u8 slice, copying the data.
+    ///
+    /// Uses 1-byte alignment (no alignment requirement for u8).
     pub fn from_u8_slice(values: &[u8]) -> Self {
         let capacity = values.len();
         let mut inner = BufferInner::new(capacity, 1);
@@ -83,12 +120,19 @@ impl Buffer {
         }
     }
 
-    /// Read the contents of buffer as a slice of u8
+    /// Returns the buffer contents as a byte slice.
     pub fn as_u8_slice(&self) -> &[u8] {
+        // SAFETY: ptr() returns valid pointer, length is tracked correctly
         unsafe { slice::from_raw_parts(self.ptr(), self.length) }
     }
 
-    /// Read the contents of buffer as a slice of i32
+    /// Returns the buffer contents as an i32 slice.
+    ///
+    /// ## Panics
+    /// - If length is not divisible by 4 (size of i32)
+    /// - If pointer is not 4-byte aligned
+    ///
+    /// Prefer using `ScalarBuffer<i32>` which enforces these at construction time.
     pub fn as_i32_slice(&self) -> &[i32] {
         assert_eq!(self.length % 4, 0, "Buffer length not divisible by 4");
         assert_eq!(self.ptr() as usize % 4, 0, "Buffer not aligned for i32");
@@ -96,21 +140,40 @@ impl Buffer {
         unsafe { slice::from_raw_parts(self.ptr() as *const i32, self.length / 4) }
     }
 
+    /// Returns the number of bytes in this buffer.
     pub fn len(&self) -> usize {
         self.length
     }
 
+    /// Returns a raw pointer to the start of this buffer's data.
+    ///
+    /// The pointer accounts for any slice offset, so it points to the first
+    /// byte visible through this Buffer, not necessarily the start of the allocation.
     pub fn ptr(&self) -> *const u8 {
         self.inner.offset_ptr(self.offset)
     }
 }
 
 impl<T: NativeType> From<Vec<T>> for Buffer {
+    /// Takes ownership of a Vec's allocation without copying.
+    ///
+    /// ## How it works
+    /// 1. Extract the Vec's pointer, length, and capacity
+    /// 2. Create a Layout matching the Vec's allocation
+    /// 3. `mem::forget(value)` prevents Vec's destructor from freeing the memory
+    /// 4. BufferInner now owns the memory and will free it on drop
+    ///
+    /// This is safe because:
+    /// - Vec guarantees proper alignment for T
+    /// - We preserve the exact Layout for correct deallocation
+    /// - The Vec is forgotten, so no double-free
     fn from(value: Vec<T>) -> Self {
         let ptr = NonNull::new(value.as_ptr() as _).unwrap();
         let length = value.len() * T::get_byte_width();
+        // Use capacity (not len) to get the actual allocation size
         let layout = Layout::array::<T>(value.capacity()).unwrap();
         let inner = Arc::new(BufferInner::from_raw_parts(ptr, length, layout));
+        // CRITICAL: forget the Vec so it doesn't free the memory we just took ownership of
         std::mem::forget(value);
         Self {
             inner,
@@ -120,25 +183,39 @@ impl<T: NativeType> From<Vec<T>> for Buffer {
     }
 }
 
-/// Inner buffer holding the actual allocated memory.
+/// The actual memory allocation, shared by multiple Buffers via Arc.
 ///
-/// We use custom allocation to guarantee proper alignment for typed access.
-/// While Vec<u8> may happen to be aligned (allocators often align to 8/16 bytes),
-/// the Rust type system only guarantees 1-byte alignment for Vec<u8>.
+/// ## Why custom allocation instead of Vec<u8>?
 ///
-/// To safely reinterpret bytes as i32/i64, we need explicit alignment guarantees.
-/// Creating a misaligned reference (&[i32]) is undefined behavior in Rust,
-/// even on CPUs that tolerate misaligned access.
+/// We need guaranteed alignment for typed access. While Vec<u8> may happen to be
+/// aligned (allocators often align to 8/16 bytes), Rust only *guarantees* 1-byte
+/// alignment for Vec<u8>.
+///
+/// To safely reinterpret bytes as i32/f64/etc, we need explicit alignment.
+/// Creating a misaligned reference (e.g., &[i32] at address 0x1001) is undefined
+/// behavior in Rust, even on CPUs that tolerate misaligned access.
+///
+/// ## Memory ownership
+///
+/// BufferInner owns the allocation and frees it on drop. The `layout` field stores
+/// the exact Layout used for allocation, which is required for correct deallocation.
 struct BufferInner {
-    ptr: NonNull<u8>, // Pointer to allocated memory
-    length: usize,    // Number of bytes
-    capacity: usize,  // Allocated capacity
-    layout: Layout,   // For deallocation
+    /// Pointer to allocated memory. NonNull provides null-safety and covariance.
+    ptr: NonNull<u8>,
+    /// Number of bytes currently in use (may be less than capacity).
+    length: usize,
+    /// Total allocated bytes. Currently unused but kept for potential future use
+    /// (e.g., growing buffers, debugging).
+    #[allow(dead_code)]
+    capacity: usize,
+    /// The Layout used for allocation. MUST be stored and reused for deallocation,
+    /// as dealloc() requires the exact same Layout that was passed to alloc().
+    layout: Layout,
 }
 
 impl BufferInner {
+    /// Allocates a new buffer with the given capacity and alignment.
     fn new(capacity: usize, alignment: usize) -> Self {
-        // Allocate memory with correct alignment
         let layout = Layout::from_size_align(capacity, alignment).unwrap();
         let ptr = unsafe { alloc(layout) };
 
@@ -156,6 +233,12 @@ impl BufferInner {
         }
     }
 
+    /// Creates a BufferInner from an existing allocation (e.g., from a Vec).
+    ///
+    /// ## Safety contract
+    /// The caller must ensure:
+    /// - `ptr` points to memory allocated with the given `layout`
+    /// - The memory will not be freed elsewhere (caller must forget the original owner)
     fn from_raw_parts(ptr: NonNull<u8>, length: usize, layout: Layout) -> BufferInner {
         Self {
             ptr,
@@ -165,10 +248,14 @@ impl BufferInner {
         }
     }
 
+    /// Returns a pointer offset by `n` bytes from the start.
     fn offset_ptr(&self, n: usize) -> *const u8 {
+        // SAFETY: Callers ensure n is within bounds
         unsafe { self.ptr.as_ptr().add(n) }
     }
 
+    /// Returns the raw pointer to the start of the allocation.
+    #[allow(dead_code)]
     fn ptr(&self) -> *const u8 {
         self.ptr.as_ptr()
     }
@@ -176,8 +263,9 @@ impl BufferInner {
 
 impl Drop for BufferInner {
     fn drop(&mut self) {
+        // SAFETY: We allocated this memory with the stored layout, and we're the
+        // sole owner (guaranteed by Arc). Using the same layout for dealloc is required.
         unsafe {
-            // Free the allocated memory using the same layout we used to allocate
             dealloc(self.ptr.as_ptr(), self.layout);
         }
     }

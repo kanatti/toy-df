@@ -1,12 +1,33 @@
 use crate::Buffer;
 
+/// A validity bitmap indicating which values in an array are null.
+///
+/// Arrow uses bit-packing for space efficiency: 1 bit per element instead of 1 byte.
+/// This gives 8x memory savings (e.g., 125 bytes for 1000 elements vs 1000 bytes).
+///
+/// ## Convention
+/// - Bit = 1 (true) → value is **valid** (not null)
+/// - Bit = 0 (false) → value is **null**
+///
+/// ## Example
+/// ```text
+/// Values:    [10, NULL, 30, NULL, 50]
+/// Validity:  [ 1,    0,  1,    0,  1]  (as bits)
+/// Packed:    0b00010101 = 21          (single byte)
+/// ```
 pub struct NullBuffer {
-    buffer: Buffer,    // storage
-    len: usize,        // length of bits
-    null_count: usize, // count of nulls
+    buffer: Buffer,
+    /// Number of logical elements (bits), not bytes.
+    len: usize,
+    /// Cached count of null values. Computing this requires scanning all bits O(n),
+    /// so we cache it at construction for O(1) access. Query engines frequently
+    /// check if arrays have nulls, making this optimization worthwhile.
+    null_count: usize,
 }
 
 impl NullBuffer {
+    /// Creates a NullBuffer from a raw buffer and logical length.
+    /// Scans the buffer to compute and cache the null count.
     pub fn new(buffer: Buffer, len: usize) -> Self {
         let mut null_count = 0;
         for i in 0..len {
@@ -22,47 +43,72 @@ impl NullBuffer {
         }
     }
 
+    /// Creates a NullBuffer from a slice of booleans.
+    /// `true` means valid, `false` means null.
     pub fn from_bools(bools: &[bool]) -> Self {
         let buffer = Self::pack_bools(bools);
         Self::new(buffer, bools.len())
     }
 
+    /// Returns the cached null count in O(1).
     pub fn null_count(&self) -> usize {
         self.null_count
     }
 
+    /// Returns the number of logical elements (not bytes).
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Returns true if the value at `idx` is null (bit is 0).
     pub fn is_null(&self, idx: usize) -> bool {
         assert!(idx < self.len, "index out of bounds");
         is_null_bit(&self.buffer, idx)
     }
 
+    /// Packs booleans into bytes, with least-significant bit first (LSB numbering).
+    ///
+    /// Example: `[true, false, true, true, false, false, true, false]`
+    /// ```text
+    /// Index:      0     1     2     3     4     5     6     7
+    /// Value:      1     0     1     1     0     0     1     0
+    /// Bit pos:    0     1     2     3     4     5     6     7  (LSB to MSB)
+    /// ```
+    /// Byte = 0b01001101 = 77
+    ///
+    /// Why LSB first? Arrow spec uses this convention. Bit 0 is the least significant bit.
     fn pack_bools(bools: &[bool]) -> Buffer {
+        // Ceiling division: 8 bools need 1 byte, 9 bools need 2 bytes
         let num_bytes = (bools.len() + 7) / 8;
-        // TODO: vec can be avoided.
         let mut bytes = vec![0u8; num_bytes];
 
-        for (i, &bit) in bools.iter().enumerate() {
-            if bit {
-                // i / 8 -> which bytes contain bit i
-                // i % 8 -> position of bit in that byte
-                // 1 << (i % 8) -> Creates a mask with just i set
-                // |= -> bitwise OR
+        for (i, &is_valid) in bools.iter().enumerate() {
+            if is_valid {
+                // i / 8      → which byte contains bit i
+                // i % 8      → position within that byte (0-7)
+                // 1 << (i%8) → mask with only that bit set
+                // |=         → set the bit (OR preserves other bits)
                 bytes[i / 8] |= 1 << (i % 8);
             }
+            // If !is_valid, leave bit as 0 (null)
         }
 
         Buffer::from_u8_slice(&bytes)
     }
 }
 
+/// Checks if the bit at `idx` is 0 (null).
+///
+/// ```text
+/// To check bit 5 in byte 0b01001101:
+///   mask = 1 << 5 = 0b00100000
+///   byte & mask   = 0b00000000  (bit 5 is 0, so result is 0)
+///   result == 0   → true, it's null
+/// ```
 fn is_null_bit(buffer: &Buffer, idx: usize) -> bool {
     let byte = buffer.as_u8_slice()[idx / 8];
-    // (1 << (idx % 8)) -> mask with idx set
-    (byte & (1 << (idx % 8))) == 0
+    let mask = 1 << (idx % 8);
+    (byte & mask) == 0
 }
 
 #[cfg(test)]
