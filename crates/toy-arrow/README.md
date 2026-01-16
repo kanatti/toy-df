@@ -117,15 +117,18 @@ pub struct ScalarBuffer<T: ArrowNativeType> {
 ---
 
 ### 1.6 BooleanBuffer (`buffer/boolean.rs`)
-- [ ] Bit-packed boolean storage (1 bit per value)
-- [ ] Separate from NullBuffer (this is for boolean array values)
-- [ ] `len()` in bits, not bytes
-- [ ] `value(i)` / `is_set(i)` to read individual bits
+- [x] Bit-packed boolean storage (1 bit per value)
+- [x] Separate from NullBuffer (this is for boolean array values)
+- [x] `len()` in bits, not bytes
+- [x] `value(i)` to read individual bits
+- [x] `from_bools()` constructor with bit-packing
 - [ ] `set_bit()`, `unset_bit()` for mutation (via builder)
 - [ ] `count_set_bits()` efficient counting
 - [ ] Slicing with bit offset support
 
 **Space Efficiency**: 8x memory savings vs byte-per-bool
+
+**Design Note**: NullBuffer wraps BooleanBuffer internally, adding only cached `null_count` and inverted semantics.
 
 ---
 
@@ -171,11 +174,13 @@ pub struct OffsetBuffer<T: ArrowNativeType>(ScalarBuffer<T>);
 
 ---
 
-### 1.11 Bit Utilities (`util/`)
-- [ ] `bit_util.rs`: `get_bit()`, `set_bit()`, `ceil()`, `round_upto_multiple_of_64()`
-- [ ] `bit_mask.rs`: Creating bit masks
-- [ ] `bit_iterator.rs`: `BitIterator` for iterating over bits
-- [ ] `bit_chunk_iterator.rs`: `BitChunks` for 64-bit chunk iteration (SIMD friendly)
+### 1.11 Bit Utilities (`bit_util.rs`)
+- [x] `get_bit()`: Read individual bit from buffer
+- [x] `pack_bools()`: Pack boolean slice into bit-packed buffer
+- [ ] `set_bit()`: Set individual bit in buffer
+- [ ] `ceil()`, `round_upto_multiple_of_64()`
+- [ ] `BitIterator` for iterating over bits
+- [ ] `BitChunks` for 64-bit chunk iteration (SIMD friendly)
 
 ---
 
@@ -814,7 +819,9 @@ fn process_column(arr: &ArrayRef) {
 - **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy, From<Vec<T>>
 - **NativeType** (1.4): Sealed trait, get_byte_width(), get_alignment(), implemented for all primitives
 - **ScalarBuffer<T>** (1.5): Type-safe wrapper, Deref to &[T], slice(), From<Vec<T>>, Clone
-- **NullBuffer** (1.7): Bit-packing, cached null_count, is_null, from_bools
+- **BooleanBuffer** (1.6): Bit-packed boolean storage, value(), from_bools(), len()
+- **NullBuffer** (1.7): Wraps BooleanBuffer, cached null_count, is_null, from_bools
+- **Bit Utilities** (1.11): `get_bit()`, `pack_bools()` in `bit_util.rs`
 
 ### 📋 Not Yet Implemented
 | Section | Items |
@@ -822,22 +829,21 @@ fn process_column(arr: &ArrayRef) {
 | 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
 | 1.3 MutableBuffer | Entire section |
 | 1.4 NativeType | `from_usize()`, `to_usize()` conversions |
-| 1.6 BooleanBuffer | Entire section |
+| 1.6 BooleanBuffer | `slice()`, `count_set_bits()`, iterators |
 | 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
 | 1.8 OffsetBuffer | Entire section |
 | 1.9 RunEndBuffer | Entire section |
 | 1.10 Buffer Ops | AND, OR, XOR, NOT |
-| 1.11 Bit Utilities | `get_bit()`, `set_bit()`, iterators |
+| 1.11 Bit Utilities | `set_bit()`, iterators |
 | 1.12 Builders | All builders |
 | 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
 
 ### Recommended Next Steps
-1. **BooleanBuffer** (1.6) - Needed for BooleanArray values
-2. **MutableBuffer** (1.3) - Needed for builders
-3. **Builders** (1.12) - Construction patterns
-4. **Layer 2: Type System** - DataType, Schema, ArrowPrimitiveType
+1. **MutableBuffer** (1.3) - Needed for builders
+2. **Builders** (1.12) - Construction patterns
+3. **Layer 2: Type System** - DataType, Schema, ArrowPrimitiveType
 
-**Test Status**: 20/20 tests passing ✅
+**Test Status**: 26/26 tests passing ✅
 
 ---
 
