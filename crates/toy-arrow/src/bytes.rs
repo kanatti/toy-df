@@ -26,7 +26,6 @@ pub struct Bytes {
     length: usize,
     /// Total allocated bytes. Currently unused but kept for potential future use
     /// (e.g., growing buffers, debugging).
-    #[allow(dead_code)]
     capacity: usize,
     /// The Layout used for allocation. MUST be stored and reused for deallocation,
     /// as dealloc() requires the exact same Layout that was passed to alloc().
@@ -74,9 +73,26 @@ impl Bytes {
         unsafe { self.ptr.as_ptr().add(n) }
     }
 
+    /// Returns a mutable pointer offset by `n` bytes from the start.
+    pub fn offset_ptr_mut(&self, n: usize) -> *mut u8 {
+        unsafe { self.ptr.as_ptr().add(n) }
+    }
+
     /// Returns the raw pointer to the start of the allocation.
     pub fn ptr(&self) -> NonNull<u8> {
         self.ptr
+    }
+
+    pub fn alignment(&self) -> usize {
+        self.layout.align()
+    }
+
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 
     pub fn set_length(&mut self, length: usize) {
