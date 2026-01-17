@@ -98,7 +98,7 @@ impl<T: NativeType> Deref for ScalarBuffer<T> {
         // SAFETY: See doc comment above. The key invariants are:
         // - Pointer is aligned (checked in From<Buffer>)
         // - Length is valid (buffer.len() / byte_width gives correct count)
-        // - Memory is valid for reads (owned by BufferInner via Arc)
+        // - Memory is valid for reads (owned by Bytes via Arc)
         unsafe {
             std::slice::from_raw_parts(
                 self.buffer.ptr() as *const T,
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_from_i32_buffer() {
-        let buffer = Buffer::from_i32_slice(&[1, 2, 3, 4, 5]);
+        let buffer = Buffer::from(vec![1i32, 2, 3, 4, 5]);
         let scalar: ScalarBuffer<i32> = buffer.into();
 
         assert_eq!(scalar.len(), 5);
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_from_u8_buffer() {
-        let buffer = Buffer::from_u8_slice(&[10, 20, 30]);
+        let buffer = Buffer::from(vec![10u8, 20, 30]);
         let scalar: ScalarBuffer<u8> = buffer.into();
 
         assert_eq!(scalar.len(), 3);
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_deref_coercion() {
-        let buffer = Buffer::from_i32_slice(&[100, 200, 300]);
+        let buffer = Buffer::from(vec![100i32, 200, 300]);
         let scalar: ScalarBuffer<i32> = buffer.into();
 
         let slice: &[i32] = &scalar;
@@ -146,9 +146,23 @@ mod tests {
     #[test]
     #[should_panic(expected = "Buffer pointer not aligned")]
     fn test_unaligned_panics() {
-        let buffer = Buffer::from_u8_slice(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        let buffer = Buffer::from(vec![0u8, 1, 2, 3, 4, 5, 6, 7]);
         let sliced = buffer.slice(1, 4); // offset 1 = misaligned for i32
         let _: ScalarBuffer<i32> = sliced.into();
+    }
+
+    #[test]
+    #[should_panic(expected = "Buffer pointer not aligned")]
+    fn test_slice_misaligned_panics() {
+        // Create a u8 buffer and slice it at an odd offset to misalign it for i32
+        let values = vec![0u8, 1, 2, 3, 4, 5, 6, 7];
+        let buffer = Buffer::from(values);
+
+        // Slice at offset 1 creates a misaligned buffer for i32 (which needs 4-byte alignment)
+        let misaligned = buffer.slice(1, 4);
+
+        // ScalarBuffer should panic on construction when buffer is misaligned
+        let _: ScalarBuffer<i32> = misaligned.into();
     }
 
     #[test]

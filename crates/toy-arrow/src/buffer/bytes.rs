@@ -1,5 +1,5 @@
 use std::{
-    alloc::{Layout, alloc, dealloc},
+    alloc::{Layout, dealloc},
     ptr::NonNull,
 };
 
@@ -22,49 +22,22 @@ use std::{
 pub struct Bytes {
     /// Pointer to allocated memory. NonNull provides null-safety and covariance.
     ptr: NonNull<u8>,
-    /// Number of bytes currently in use (may be less than capacity).
-    length: usize,
-    /// Total allocated bytes. Currently unused but kept for potential future use
-    /// (e.g., growing buffers, debugging).
-    capacity: usize,
+    /// Number of bytes in this allocation.
+    len: usize,
     /// The Layout used for allocation. MUST be stored and reused for deallocation,
     /// as dealloc() requires the exact same Layout that was passed to alloc().
     layout: Layout,
 }
 
 impl Bytes {
-    /// Allocates a new buffer with the given capacity and alignment.
-    pub fn new(capacity: usize, alignment: usize) -> Self {
-        let layout = Layout::from_size_align(capacity, alignment).unwrap();
-        let ptr = unsafe { alloc(layout) };
-
-        if ptr.is_null() {
-            panic!("Allocation failed!");
-        }
-
-        let ptr = NonNull::new(ptr).unwrap();
-
-        Self {
-            ptr,
-            length: 0,
-            capacity,
-            layout,
-        }
-    }
-
-    /// Creates a Bytes from an existing allocation (e.g., from a Vec).
+    /// Creates a Bytes from an existing allocation.
     ///
     /// ## Safety contract
     /// The caller must ensure:
     /// - `ptr` points to memory allocated with the given `layout`
     /// - The memory will not be freed elsewhere (caller must forget the original owner)
-    pub fn from_raw_parts(ptr: NonNull<u8>, length: usize, layout: Layout) -> Self {
-        Self {
-            ptr,
-            length,
-            capacity: layout.size(),
-            layout,
-        }
+    pub unsafe fn new(ptr: NonNull<u8>, len: usize, layout: Layout) -> Self {
+        Self { ptr, len, layout }
     }
 
     /// Returns a pointer offset by `n` bytes from the start.
@@ -73,58 +46,28 @@ impl Bytes {
         unsafe { self.ptr.as_ptr().add(n) }
     }
 
-    /// Returns a mutable pointer offset by `n` bytes from the start.
-    pub fn offset_ptr_mut(&self, n: usize) -> *mut u8 {
-        unsafe { self.ptr.as_ptr().add(n) }
-    }
-
     /// Returns the raw pointer to the start of the allocation.
     pub fn ptr(&self) -> NonNull<u8> {
         self.ptr
     }
 
-    pub fn alignment(&self) -> usize {
-        self.layout.align()
-    }
-
-    pub fn length(&self) -> usize {
-        self.length
-    }
-
-    pub fn capacity(&self) -> usize {
-        self.capacity
-    }
-
-    pub fn set_length(&mut self, length: usize) {
-        self.length = length;
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 
 impl Drop for Bytes {
     fn drop(&mut self) {
+        // Skip deallocation for zero-sized layouts.
+        // Calling dealloc() with a zero-sized layout is undefined behavior.
+        if self.layout.size() == 0 {
+            return;
+        }
+
         // SAFETY: We allocated this memory with the stored layout, and we're the
         // sole owner (guaranteed by Arc). Using the same layout for dealloc is required.
         unsafe {
             dealloc(self.ptr.as_ptr(), self.layout);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new() {
-        let bytes = Bytes::new(100, 8);
-        assert_eq!(bytes.capacity, 100);
-        assert_eq!(bytes.length, 0);
-    }
-
-    #[test]
-    fn test_alignment() {
-        let bytes = Bytes::new(100, 8);
-        let addr = bytes.ptr.as_ptr() as usize;
-        assert_eq!(addr % 8, 0, "Pointer should be 8-byte aligned");
     }
 }

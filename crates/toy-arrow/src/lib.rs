@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 
 pub mod bit_util;
 pub mod buffer;
-pub mod bytes;
 pub mod native;
 
 pub use buffer::{Buffer, NullBuffer};

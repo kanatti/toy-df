@@ -41,5 +41,5 @@ pub fn pack_bools(bools: &[bool]) -> Buffer {
         // If !is_valid, leave bit as 0 (null)
     }
 
-    Buffer::from_u8_slice(&bytes)
+    Buffer::from(bytes)
 }
