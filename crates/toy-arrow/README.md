@@ -67,9 +67,10 @@ struct BufferInner {
 ---
 
 ### 1.3 Mutable Buffer (`buffer/mutable.rs`)
-- [ ] `MutableBuffer`: Growing buffer during construction
-- [ ] `with_capacity()` pre-allocation
-- [ ] `push()`, `extend_from_slice()` for appending
+- [x] `MutableBuffer`: Growing buffer during construction
+- [x] `with_capacity()` pre-allocation
+- [x] `push()`, `extend_from_slice()` for appending
+- [x] `grow()` private method with 2x growth strategy
 - [ ] `reserve()` for capacity management
 - [ ] `into_buffer()` conversion to immutable `Buffer`
 - [ ] `freeze()` pattern (mutable → immutable)
@@ -720,19 +721,20 @@ fn process_column(arr: &ArrayRef) {
 ## Implementation Roadmap
 
 ### Phase 1a: Buffer Foundation ✅
-- [x] BufferInner with custom allocation
+- [x] Bytes (renamed from BufferInner) with custom allocation
 - [x] Buffer with Arc-based sharing
 - [x] Zero-copy slicing
 - [x] NullBuffer basics
 
-### Phase 1b: Type System for Buffers (Current)
-- [ ] ArrowNativeType trait (sealed, for primitives)
-- [ ] ScalarBuffer<T> (generic typed buffer)
-- [ ] BooleanBuffer (bit-packed, separate from NullBuffer)
-- [ ] Bit utilities (get_bit, set_bit, iterators)
+### Phase 1b: Type System for Buffers ✅
+- [x] ArrowNativeType trait (sealed, for primitives)
+- [x] ScalarBuffer<T> (generic typed buffer)
+- [x] BooleanBuffer (bit-packed, separate from NullBuffer)
+- [x] Bit utilities (get_bit, pack_bools)
 
-### Phase 1c: Mutable Buffers & Builders
-- [ ] MutableBuffer (growable)
+### Phase 1c: Mutable Buffers & Builders (Current)
+- [x] MutableBuffer (growable) - core methods done
+- [ ] MutableBuffer - reserve(), into_buffer()
 - [ ] BufferBuilder<T>
 - [ ] BooleanBufferBuilder
 - [ ] NullBufferBuilder
@@ -815,8 +817,9 @@ fn process_column(arr: &ArrayRef) {
 **Layer 1: Memory Management & Buffers** - In Progress
 
 ### ✅ Completed
-- **BufferInner** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation, from_raw_parts
+- **Bytes** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation, from_raw_parts (refactored from BufferInner)
 - **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy, From<Vec<T>>
+- **MutableBuffer** (1.3): with_capacity(), push(), extend_from_slice(), grow() with 2x strategy
 - **NativeType** (1.4): Sealed trait, get_byte_width(), get_alignment(), implemented for all primitives
 - **ScalarBuffer<T>** (1.5): Type-safe wrapper, Deref to &[T], slice(), From<Vec<T>>, Clone
 - **BooleanBuffer** (1.6): Bit-packed boolean storage, value(), from_bools(), len()
@@ -827,7 +830,7 @@ fn process_column(arr: &ArrayRef) {
 | Section | Items |
 |---------|-------|
 | 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
-| 1.3 MutableBuffer | Entire section |
+| 1.3 MutableBuffer | `reserve()`, `into_buffer()`, `freeze()` |
 | 1.4 NativeType | `from_usize()`, `to_usize()` conversions |
 | 1.6 BooleanBuffer | `slice()`, `count_set_bits()`, iterators |
 | 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
@@ -839,11 +842,11 @@ fn process_column(arr: &ArrayRef) {
 | 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
 
 ### Recommended Next Steps
-1. **MutableBuffer** (1.3) - Needed for builders
-2. **Builders** (1.12) - Construction patterns
+1. **Complete MutableBuffer** (1.3) - `reserve()`, `into_buffer()`
+2. **Builders** (1.12) - Construction patterns (can start now with current MutableBuffer)
 3. **Layer 2: Type System** - DataType, Schema, ArrowPrimitiveType
 
-**Test Status**: 26/26 tests passing ✅
+**Test Status**: 31/31 tests passing ✅
 
 ---
 
