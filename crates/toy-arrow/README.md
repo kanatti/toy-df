@@ -739,10 +739,12 @@ fn process_column(arr: &ArrayRef) {
 - [ ] BooleanBufferBuilder
 - [ ] NullBufferBuilder
 
-### Phase 2: Type System & Schema (Current)
-- [ ] DataType enum (primitives first)
-- [ ] Field and Schema basics
-- [ ] ArrowPrimitiveType trait (connects Rust types to DataType)
+### Phase 2: Type System & Schema ✅
+- [x] DataType enum (primitives: Int8-64, UInt8-64, Float32/64, Boolean, Utf8, Binary, Timestamp)
+- [x] TimeUnit enum (Second, Millisecond, Microsecond, Nanosecond)
+- [x] Field struct (name, data_type, nullable)
+- [x] Schema struct (collection of Fields)
+- [x] PrimitiveType trait with marker types (Int32Type, Float64Type, etc.)
 
 ### Phase 1d: Specialized Buffers
 - [ ] OffsetBuffer<T> (for strings/lists)
@@ -750,12 +752,8 @@ fn process_column(arr: &ArrayRef) {
 - [ ] RunEndBuffer<T> (for RLE)
 - [ ] Buffer bitwise operations (AND, OR, NOT)
 
-### Phase 2: Type System & Schema
-- [ ] DataType enum (primitives first)
-- [ ] Field and Schema basics
-- [ ] ArrowPrimitiveType trait (connects Rust types to DataType)
-
-### Phase 3: Arrays
+### Phase 3: Array Data & Primitive Arrays (Current)
+- [ ] ArrayData structure (low-level physical layout)
 - [ ] PrimitiveArray<T> implementation
 - [ ] BooleanArray
 - [ ] Int32Array, Float64Array type aliases
@@ -765,7 +763,6 @@ fn process_column(arr: &ArrayRef) {
 - [ ] GenericByteArray for strings
 - [ ] StringArray, BinaryArray
 - [ ] GenericListArray
-- [ ] ArrayData structure
 
 ### Phase 5: Advanced Arrays
 - [ ] StructArray
@@ -819,23 +816,32 @@ fn process_column(arr: &ArrayRef) {
 
 ## Current Status
 
-**Layer 1: Memory Management & Buffers** - In Progress
+**Layer 3: Array Data & Primitive Arrays** - In Progress
 
 ### ✅ Completed
+
+**Layer 1: Memory Management & Buffers**
 - **Bytes** (1.1): Custom allocation with Layout, NonNull, alignment, deallocation, from_raw_parts (refactored from BufferInner)
 - **Buffer** (1.2): Arc-based sharing, zero-copy slicing, clone without copy, From<Vec<T>>
-- **MutableBuffer** (1.3): with_capacity(), push(), extend_from_slice(), grow() with 2x strategy
+- **MutableBuffer** (1.3): with_capacity(), push(), extend_from_slice(), grow() with 2x strategy, reserve(), into_buffer()
 - **NativeType** (1.4): Sealed trait, get_byte_width(), get_alignment(), implemented for all primitives
 - **ScalarBuffer<T>** (1.5): Type-safe wrapper, Deref to &[T], slice(), From<Vec<T>>, Clone
 - **BooleanBuffer** (1.6): Bit-packed boolean storage, value(), from_bools(), len()
 - **NullBuffer** (1.7): Wraps BooleanBuffer, cached null_count, is_null, from_bools
 - **Bit Utilities** (1.11): `get_bit()`, `pack_bools()` in `bit_util.rs`
 
+**Layer 2: Type System & Schema**
+- **DataType** (2.1): Enum with primitives (Int8-64, UInt8-64, Float32/64, Boolean, Utf8, Binary, Timestamp)
+- **TimeUnit** (2.1): Enum for timestamp units (Second, Millisecond, Microsecond, Nanosecond)
+- **Field** (2.2): Struct with name, data_type, nullable
+- **Schema** (2.2): Struct with Vec<Field>
+- **PrimitiveType** (2.3): Trait connecting DataType to native types via marker types (Int32Type, Float64Type, etc.)
+
 ### 📋 Not Yet Implemented
 | Section | Items |
 |---------|-------|
 | 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
-| 1.3 MutableBuffer | `reserve()`, `into_buffer()`, `freeze()` |
+| 1.3 MutableBuffer | `freeze()` |
 | 1.4 NativeType | `from_usize()`, `to_usize()` conversions |
 | 1.6 BooleanBuffer | `slice()`, `count_set_bits()`, iterators |
 | 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
@@ -847,9 +853,9 @@ fn process_column(arr: &ArrayRef) {
 | 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
 
 ### Recommended Next Steps
-1. **Complete MutableBuffer** (1.3) - `reserve()`, `into_buffer()`
-2. **Builders** (1.12) - Construction patterns (can start now with current MutableBuffer)
-3. **Layer 2: Type System** - DataType, Schema, ArrowPrimitiveType
+1. **ArrayData** (3.1) - Low-level physical layout structure (buffers + metadata)
+2. **PrimitiveArray<T>** (4.1) - Typed array implementation using PrimitiveType trait
+3. **Builders** (1.12) - BufferBuilder<T>, BooleanBufferBuilder, NullBufferBuilder (optional)
 
 **Test Status**: 31/31 tests passing ✅
 
