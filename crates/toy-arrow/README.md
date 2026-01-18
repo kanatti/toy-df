@@ -71,8 +71,8 @@ struct BufferInner {
 - [x] `with_capacity()` pre-allocation
 - [x] `push()`, `extend_from_slice()` for appending
 - [x] `grow()` private method with 2x growth strategy
-- [ ] `reserve()` for capacity management
-- [ ] `into_buffer()` conversion to immutable `Buffer`
+- [x] `reserve()` for capacity management
+- [x] `into_buffer()` conversion to immutable `Buffer`
 - [ ] `freeze()` pattern (mutable → immutable)
 
 **Pattern**: Mutable construction → immutable use
@@ -732,12 +732,17 @@ fn process_column(arr: &ArrayRef) {
 - [x] BooleanBuffer (bit-packed, separate from NullBuffer)
 - [x] Bit utilities (get_bit, pack_bools)
 
-### Phase 1c: Mutable Buffers & Builders (Current)
-- [x] MutableBuffer (growable) - core methods done
-- [ ] MutableBuffer - reserve(), into_buffer()
+### Phase 1c: Mutable Buffers & Builders ✅
+- [x] MutableBuffer (growable) - all core methods done
+- [x] MutableBuffer - reserve(), into_buffer()
 - [ ] BufferBuilder<T>
 - [ ] BooleanBufferBuilder
 - [ ] NullBufferBuilder
+
+### Phase 2: Type System & Schema (Current)
+- [ ] DataType enum (primitives first)
+- [ ] Field and Schema basics
+- [ ] ArrowPrimitiveType trait (connects Rust types to DataType)
 
 ### Phase 1d: Specialized Buffers
 - [ ] OffsetBuffer<T> (for strings/lists)
