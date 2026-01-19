@@ -123,9 +123,9 @@ pub struct ScalarBuffer<T: ArrowNativeType> {
 - [x] `len()` in bits, not bytes
 - [x] `value(i)` to read individual bits
 - [x] `from_bools()` constructor with bit-packing
+- [x] Slicing with bit offset support
 - [ ] `set_bit()`, `unset_bit()` for mutation (via builder)
-- [ ] `count_set_bits()` efficient counting
-- [ ] Slicing with bit offset support
+- [ ] `count_set_bits()` efficient counting (use u64 chunks + POPCNT, ~64x faster than bit-by-bit)
 
 **Space Efficiency**: 8x memory savings vs byte-per-bool
 
@@ -139,6 +139,7 @@ pub struct ScalarBuffer<T: ArrowNativeType> {
 - [x] `null_count()` in O(1) (cached on construction)
 - [x] `is_null(idx)` method
 - [x] `from_bools()` constructor with bit-packing
+- [x] `slice()` with null_count recomputation
 - [ ] `union()` / `intersect()` operations for combining masks
 - [ ] Efficient construction from iterators
 - [ ] `contains_nulls()` quick check
@@ -308,18 +309,27 @@ struct ArrayData {
 **Crate**: `arrow-array`
 
 ### 4.1 PrimitiveArray<T>
-- [ ] Generic over `ArrowPrimitiveType`
-- [ ] Wraps `ArrayData` with typed access
-- [ ] `values()` returns `&ScalarBuffer<T::Native>`
-- [ ] `null_count()`, `is_null(i)`, `is_valid(i)`
+- [x] Generic over `PrimitiveType`
+- [x] Stores `ScalarBuffer<T::Native>` directly (not ArrayData - that's for interchange)
+- [x] `values()` returns `&ScalarBuffer<T::Native>`
+- [x] `value(i)` returns `T::Native` (no null check - caller uses `is_null()`)
+- [x] `is_null(i)` method
+- [x] `len()` method
+- [x] `slice(offset, len)` zero-copy slicing
+- [ ] `null_count()`, `is_valid(i)`
 - [ ] Type aliases: `Int32Array`, `Float64Array`
+- [ ] `iter()` method
+- [ ] `From<Vec<T>>`, `From<Vec<Option<T>>>` constructors
+
+**Key Insight**: PrimitiveArray stores components directly for efficient access. ArrayData is only for FFI/IPC interchange.
 
 **Key Methods**:
 ```rust
-impl<T: ArrowPrimitiveType> PrimitiveArray<T> {
+impl<T: PrimitiveType> PrimitiveArray<T> {
     fn value(&self, i: usize) -> T::Native;
     fn values(&self) -> &ScalarBuffer<T::Native>;
-    fn iter(&self) -> impl Iterator<Item = Option<T::Native>>;
+    fn is_null(&self, i: usize) -> bool;
+    fn slice(&self, offset: usize, len: usize) -> Self;
 }
 ```
 
@@ -816,7 +826,7 @@ fn process_column(arr: &ArrayRef) {
 
 ## Current Status
 
-**Layer 3: Array Data & Primitive Arrays** - In Progress
+**Layer 4: Primitive Arrays** - In Progress
 
 ### ✅ Completed
 
@@ -826,8 +836,8 @@ fn process_column(arr: &ArrayRef) {
 - **MutableBuffer** (1.3): with_capacity(), push(), extend_from_slice(), grow() with 2x strategy, reserve(), into_buffer()
 - **NativeType** (1.4): Sealed trait, get_byte_width(), get_alignment(), implemented for all primitives
 - **ScalarBuffer<T>** (1.5): Type-safe wrapper, Deref to &[T], slice(), From<Vec<T>>, Clone
-- **BooleanBuffer** (1.6): Bit-packed boolean storage, value(), from_bools(), len()
-- **NullBuffer** (1.7): Wraps BooleanBuffer, cached null_count, is_null, from_bools
+- **BooleanBuffer** (1.6): Bit-packed boolean storage, value(), from_bools(), len(), slice() with bit offset
+- **NullBuffer** (1.7): Wraps BooleanBuffer, cached null_count, is_null, from_bools, slice()
 - **Bit Utilities** (1.11): `get_bit()`, `pack_bools()` in `bit_util.rs`
 
 **Layer 2: Type System & Schema**
@@ -837,13 +847,16 @@ fn process_column(arr: &ArrayRef) {
 - **Schema** (2.2): Struct with Vec<Field>
 - **PrimitiveType** (2.3): Trait connecting DataType to native types via marker types (Int32Type, Float64Type, etc.)
 
+**Layer 4: Primitive Arrays**
+- **PrimitiveArray<T>** (4.1): Generic over PrimitiveType, stores ScalarBuffer directly, value(), values(), is_null(), len(), slice(), FromIterator<T::Native>
+
 ### 📋 Not Yet Implemented
 | Section | Items |
 |---------|-------|
 | 1.2 Buffer | `is_empty()`, `ptr_eq()`, `shrink_to_fit()` |
 | 1.3 MutableBuffer | `freeze()` |
-| 1.4 NativeType | `from_usize()`, `to_usize()` conversions |
-| 1.6 BooleanBuffer | `slice()`, `count_set_bits()`, iterators |
+| 1.4 NativeType | `from_usize()`, `to_usize()`, `Default` bound |
+| 1.6 BooleanBuffer | `count_set_bits()` (use u64 chunks + POPCNT), iterators |
 | 1.7 NullBuffer | `union()`, `intersect()`, `contains_nulls()` |
 | 1.8 OffsetBuffer | Entire section |
 | 1.9 RunEndBuffer | Entire section |
@@ -851,13 +864,13 @@ fn process_column(arr: &ArrayRef) {
 | 1.11 Bit Utilities | `set_bit()`, iterators |
 | 1.12 Builders | All builders |
 | 1.13 Allocation | ALIGNMENT constant, Deallocation enum |
+| 4.1 PrimitiveArray | `null_count()`, type aliases, `iter()`, `from_options()` |
 
 ### Recommended Next Steps
-1. **ArrayData** (3.1) - Low-level physical layout structure (buffers + metadata)
-2. **PrimitiveArray<T>** (4.1) - Typed array implementation using PrimitiveType trait
-3. **Builders** (1.12) - BufferBuilder<T>, BooleanBufferBuilder, NullBufferBuilder (optional)
-
-**Test Status**: 31/31 tests passing ✅
+1. **Type aliases** - `Int32Array`, `Float64Array`, etc. (export from schema)
+2. **from_options()** - Needs Default bound on NativeType for null slot values
+3. **Array trait** (7.1) - Common interface for type erasure
+4. **Builders** (1.12) - BufferBuilder<T>, BooleanBufferBuilder, NullBufferBuilder
 
 ---
 

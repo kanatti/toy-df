@@ -62,7 +62,15 @@ impl NullBuffer {
     }
 
     pub fn slice(&self, offset: usize, len: usize) -> Self {
-        todo!()
+        let buffer = self.buffer.slice(offset, len);
+        // Recompute null_count for the sliced region
+        let mut null_count = 0;
+        for i in 0..len {
+            if !buffer.value(i) {
+                null_count += 1;
+            }
+        }
+        Self { buffer, null_count }
     }
 }
 
@@ -110,5 +118,33 @@ mod tests {
         assert!(null_buffer.is_null(0));
         assert!(null_buffer.is_null(1));
         assert!(null_buffer.is_null(2));
+    }
+
+    #[test]
+    fn test_null_buffer_slice() {
+        // [valid, null, valid, null, valid]
+        let bools = vec![true, false, true, false, true];
+        let null_buffer = NullBuffer::from_bools(&bools);
+        assert_eq!(null_buffer.null_count(), 2);
+
+        // slice(1, 3) → [null, valid, null]
+        let sliced = null_buffer.slice(1, 3);
+        assert_eq!(sliced.len(), 3);
+        assert_eq!(sliced.null_count(), 2);
+        assert!(sliced.is_null(0));  // was index 1 (null)
+        assert!(!sliced.is_null(1)); // was index 2 (valid)
+        assert!(sliced.is_null(2));  // was index 3 (null)
+    }
+
+    #[test]
+    fn test_null_buffer_slice_no_nulls() {
+        // [valid, null, valid, valid, valid, null]
+        let bools = vec![true, false, true, true, true, false];
+        let null_buffer = NullBuffer::from_bools(&bools);
+
+        // slice(2, 3) → [valid, valid, valid]
+        let sliced = null_buffer.slice(2, 3);
+        assert_eq!(sliced.len(), 3);
+        assert_eq!(sliced.null_count(), 0);
     }
 }

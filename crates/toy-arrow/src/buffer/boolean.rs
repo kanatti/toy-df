@@ -32,6 +32,9 @@ pub struct BooleanBuffer {
     /// may not fill the last byte. For example, 5 booleans need 1 byte,
     /// but only 5 of the 8 bits are meaningful.
     len: usize,
+    /// Offset to buffer where valid booleans start.
+    /// Needed to support slicing without copy.
+    offset: usize,
 }
 
 impl BooleanBuffer {
@@ -40,7 +43,11 @@ impl BooleanBuffer {
     /// The buffer should contain bit-packed booleans. `len` is the number
     /// of boolean values, not bytes.
     pub fn new(buffer: Buffer, len: usize) -> Self {
-        Self { buffer, len }
+        Self {
+            buffer,
+            len,
+            offset: 0,
+        }
     }
 
     /// Returns the number of boolean values in this buffer.
@@ -54,7 +61,7 @@ impl BooleanBuffer {
     /// Panics if `idx >= len`.
     pub fn value(&self, idx: usize) -> bool {
         assert!(idx < self.len, "index out of bounds");
-        bit_util::get_bit(&self.buffer, idx)
+        bit_util::get_bit(&self.buffer, self.offset + idx)
     }
 
     /// Creates a BooleanBuffer from a slice of booleans.
@@ -63,6 +70,21 @@ impl BooleanBuffer {
     pub fn from_bools(bools: &[bool]) -> Self {
         let buffer = bit_util::pack_bools(bools);
         Self::new(buffer, bools.len())
+    }
+
+    pub fn slice(&self, offset: usize, len: usize) -> Self {
+        assert!(
+            offset + len <= self.len,
+            "slice out of bounds: offset {} + len {} > {}",
+            offset,
+            len,
+            self.len
+        );
+        BooleanBuffer {
+            buffer: self.buffer.clone(),
+            len,
+            offset: self.offset + offset,
+        }
     }
 }
 
@@ -133,5 +155,46 @@ mod tests {
         assert_eq!(buffer.value(2), true);
         assert_eq!(buffer.value(3), false);
         assert_eq!(buffer.value(4), true);
+    }
+
+    #[test]
+    fn test_slice_basic() {
+        // [true, false, true, true, false, false, true, false]
+        let bools = vec![true, false, true, true, false, false, true, false];
+        let buffer = BooleanBuffer::from_bools(&bools);
+
+        // slice(2, 4) → [true, true, false, false]
+        let sliced = buffer.slice(2, 4);
+        assert_eq!(sliced.len(), 4);
+        assert_eq!(sliced.value(0), true);
+        assert_eq!(sliced.value(1), true);
+        assert_eq!(sliced.value(2), false);
+        assert_eq!(sliced.value(3), false);
+    }
+
+    #[test]
+    fn test_slice_of_slice() {
+        // [true, false, true, true, false, false, true, false]
+        let bools = vec![true, false, true, true, false, false, true, false];
+        let buffer = BooleanBuffer::from_bools(&bools);
+
+        // slice(1, 6) → [false, true, true, false, false, true]
+        let sliced1 = buffer.slice(1, 6);
+        assert_eq!(sliced1.len(), 6);
+        assert_eq!(sliced1.value(0), false);
+
+        // slice again: slice(2, 3) → [true, false, false]
+        let sliced2 = sliced1.slice(2, 3);
+        assert_eq!(sliced2.len(), 3);
+        assert_eq!(sliced2.value(0), true);
+        assert_eq!(sliced2.value(1), false);
+        assert_eq!(sliced2.value(2), false);
+    }
+
+    #[test]
+    #[should_panic(expected = "slice out of bounds")]
+    fn test_slice_out_of_bounds() {
+        let buffer = BooleanBuffer::from_bools(&[true, false, true]);
+        buffer.slice(1, 3); // offset 1 + len 3 = 4 > 3
     }
 }

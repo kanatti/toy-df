@@ -5,4 +5,5 @@ pub mod data;
 pub mod native;
 pub mod schema;
 
+pub use array::*;
 pub use buffer::{Buffer, NullBuffer};
