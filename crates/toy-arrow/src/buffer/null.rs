@@ -60,6 +60,10 @@ impl NullBuffer {
     pub fn is_null(&self, idx: usize) -> bool {
         !self.buffer.value(idx)
     }
+
+    pub fn slice(&self, offset: usize, len: usize) -> Self {
+        todo!()
+    }
 }
 
 #[cfg(test)]

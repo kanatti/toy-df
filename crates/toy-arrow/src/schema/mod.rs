@@ -5,4 +5,5 @@ pub mod schema;
 
 pub use datatype::DataType;
 pub use field::Field;
+pub use primitive::PrimitiveType;
 pub use schema::Schema;

@@ -163,7 +163,7 @@ mod tests {
             buffer1.as_u8_slice().as_ptr(),
             buffer2.as_u8_slice().as_ptr()
         );
-        
+
         // Same length
         assert_eq!(buffer1.len(), buffer2.len());
     }
